@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30723.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AWSRedshiftPlugin", "AWSRedshiftPlugin\AWSRedshiftPlugin.csproj", "{8C058294-3B9C-47F7-B77F-BF7ACEED387B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoDbActionsPlugin", "MongoDbActionsPlugin\MongoDbActionsPlugin.csproj", "{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationsPlugin", "NotificationsPlugin\NotificationsPlugin.csproj", "{EEAE5216-E580-4FA2-8939-3BC2DA2DE8A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PipelineJobLoader", "PipelineJobLoader\PipelineJobLoader.csproj", "{0B18ADA6-607D-43E6-ACD5-2DA5F83582FD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProcessRunnerPlugin", "ProcessRunnerPlugin\ProcessRunnerPlugin.csproj", "{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8C058294-3B9C-47F7-B77F-BF7ACEED387B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C058294-3B9C-47F7-B77F-BF7ACEED387B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C058294-3B9C-47F7-B77F-BF7ACEED387B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C058294-3B9C-47F7-B77F-BF7ACEED387B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EEAE5216-E580-4FA2-8939-3BC2DA2DE8A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EEAE5216-E580-4FA2-8939-3BC2DA2DE8A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EEAE5216-E580-4FA2-8939-3BC2DA2DE8A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EEAE5216-E580-4FA2-8939-3BC2DA2DE8A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B18ADA6-607D-43E6-ACD5-2DA5F83582FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B18ADA6-607D-43E6-ACD5-2DA5F83582FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B18ADA6-607D-43E6-ACD5-2DA5F83582FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B18ADA6-607D-43E6-ACD5-2DA5F83582FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

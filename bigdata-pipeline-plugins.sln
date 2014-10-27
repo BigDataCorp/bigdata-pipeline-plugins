@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PipelineJobLoader", "Pipeli
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProcessRunnerPlugin", "ProcessRunnerPlugin\ProcessRunnerPlugin.csproj", "{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileListenerPlugin", "FileListenerPlugin\FileListenerPlugin.csproj", "{173A8E8D-CC77-48F1-830B-249095348960}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,7 +26,6 @@ Global
 		{8C058294-3B9C-47F7-B77F-BF7ACEED387B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8C058294-3B9C-47F7-B77F-BF7ACEED387B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AFF8D5A-DD6C-46DD-A192-72121785AC0B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{EEAE5216-E580-4FA2-8939-3BC2DA2DE8A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -39,6 +40,10 @@ Global
 		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B3B8D2FD-80A6-4D53-96B2-8622B4A5D22A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{173A8E8D-CC77-48F1-830B-249095348960}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{173A8E8D-CC77-48F1-830B-249095348960}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{173A8E8D-CC77-48F1-830B-249095348960}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{173A8E8D-CC77-48F1-830B-249095348960}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

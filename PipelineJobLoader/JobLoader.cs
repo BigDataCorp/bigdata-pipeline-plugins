@@ -66,13 +66,14 @@ namespace PipelineJobLoader
                 Jobs = new List<PipelineJob>
                 {
                     new PipelineJob ()
-                    {
-                        Type= PluginTypes.SystemModule,
+                    {                        
                         Enabled = true,
                         Scheduler = "*/30 * * * *",
                         NextExecution = DateTime.UtcNow,
-                        RootAction = new ActionDetails {
-                            PluginId = this.GetType ().FullName                            
+                        RootAction = new ActionDetails
+                        {
+                            PluginId = this.GetType ().FullName,
+                            Type = PluginTypes.SystemModule
                         }
                     }
                 }

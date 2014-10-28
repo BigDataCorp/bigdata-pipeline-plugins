@@ -34,7 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BigDataPipeline.Interfaces">
-      <HintPath>..\packages\BigDataPipeline.Interface.1.1.1\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.2.0\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="NCrontab">
       <HintPath>..\packages\ncrontab.1.0.0\lib\NCrontab.dll</HintPath>
@@ -58,6 +58,7 @@
     <Compile Include="JobLoader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SimpleHelpers\FileEncoding.cs" />
+    <Compile Include="SimpleHelpers\StreamReader.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

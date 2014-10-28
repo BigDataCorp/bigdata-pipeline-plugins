@@ -36,8 +36,9 @@
     <Reference Include="AWSSDK">
       <HintPath>..\packages\AWSSDK.2.3.5.0\lib\net45\AWSSDK.dll</HintPath>
     </Reference>
-    <Reference Include="BigDataPipeline.Interfaces">
-      <HintPath>..\packages\BigDataPipeline.Interface.1.2.0\lib\BigDataPipeline.Interfaces.dll</HintPath>
+    <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.2.1\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="Dapper">
       <HintPath>..\packages\Dapper.1.37\lib\net45\Dapper.dll</HintPath>

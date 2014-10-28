@@ -1855,7 +1855,7 @@ namespace MongoDbActionsPlugin
                 _partSize = (int)(5.1 * 1024 * 1024);
             if (_partSize > 250 * 1024 * 1024)
                 _partSize = 250 * 1024 * 1024;
-            m_writeBuffer = new MemoryStream (partSize);
+            m_writeBuffer = new MemoryStream (_partSize);
             _client.MultipartUploadStart (key, useReducedRedundancy, makePublic, throwOnError);
         }
     }

@@ -51,11 +51,13 @@ namespace AWSRedshiftPlugin
         Record _options;
         ActionLogger _logger;
         AWSS3Helper _s3;
+        ISessionContext _context;
 
-        public void SetParameters (Record options, ActionLogger logger)
+        public void SetParameters (Record options, ISessionContext context)
         {
+            _context = context;
             _options = options;
-            _logger = logger;
+            _logger = _context.GetLogger ();
         }
 
         public bool Execute (params IEnumerable<Record>[] dataStreams)

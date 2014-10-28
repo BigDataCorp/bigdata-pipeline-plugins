@@ -15,6 +15,7 @@ namespace PipelineJobLoader
         string _backupPath;
         IStorageContext _storageContext;
         ActionLogger _logger;
+        ISessionContext _context;
 
         public string Name { get; private set; }
 
@@ -39,12 +40,13 @@ namespace PipelineJobLoader
             _storageContext = storageContext;
         }
 
-        public void SetParameters (Record options, ActionLogger logger)
+        public void SetParameters (Record options, ISessionContext context)
         {
-            _logger = logger;
+            _context = context;
+            _logger = _context.GetLogger ();
             _inputPath = options.Get ("JobLoader.SearchPath", System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Jobloader", "Input", "*"));
             _backupPath = options.Get ("JobLoader.BackupPath", System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Jobloader", "Backup"));
-        }
+        }        
 
         public string GetLastError ()
         {

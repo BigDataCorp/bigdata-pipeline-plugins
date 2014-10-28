@@ -14,6 +14,7 @@ namespace NotificationsPlugin
         private string       _lastError; // Holds the Last Error Message
         private ActionLogger _logger;    // 
         private Record       _options;   // Parameters passed to this Plugin
+        ISessionContext _context;
 
         #endregion
 
@@ -61,11 +62,12 @@ namespace NotificationsPlugin
         /// Sets the Parameters and Logger for this plugin
         /// </summary>
         /// <param name="options">Plugin Parameters</param>
-        /// <param name="logger">Plugin Logger</param>
-        public void SetParameters (Record options, ActionLogger logger)
+        /// <param name="context">The context.</param>
+        public void SetParameters (Record options, ISessionContext context)
         {
+            _context = context;
             _options = options;
-            _logger  = logger;
+            _logger = _context.GetLogger ();
         }
 
         /// <summary>

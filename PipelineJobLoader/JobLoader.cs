@@ -70,7 +70,7 @@ namespace PipelineJobLoader
                     new PipelineJob ()
                     {                        
                         Enabled = true,
-                        Scheduler = "*/30 * * * *",
+                        Scheduler = new List<string> {"*/30 * * * *"},
                         NextExecution = DateTime.UtcNow,
                         RootAction = new ActionDetails
                         {
@@ -110,7 +110,7 @@ namespace PipelineJobLoader
                     if (item != null)
                     {
                         foreach (var i in item.Jobs)
-                            i.SetScheduler (i.Scheduler);
+                            i.SetScheduler (i.Scheduler != null ? i.Scheduler.ToArray () : new string[0]);
                         _storageContext.SavePipelineCollection (item);
                         _logger.Log ("Pipeline imported: " + item.Id);
                     }

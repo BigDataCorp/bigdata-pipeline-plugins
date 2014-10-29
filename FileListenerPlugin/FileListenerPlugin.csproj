@@ -35,7 +35,7 @@
     </Reference>
     <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\BigDataPipeline.Interface.1.2.1\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.3.0\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="NCrontab">
       <HintPath>..\packages\ncrontab.1.0.0\lib\NCrontab.dll</HintPath>

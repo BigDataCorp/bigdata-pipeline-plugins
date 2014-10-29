@@ -31,9 +31,8 @@ namespace NotificationsPlugin
         /// </summary>
         public NotificationHandler ()
         {
-            // TODO: Change Name and Description according to your context
-            Name        = "My Plugin Name";
-            Description = "Change the description according to your plugin tasks";
+            Name        = "Notifications Plugin ";
+            Description = "Plugin used to send emails, SMS or to make phone calls";
         }
 
         /// <summary>

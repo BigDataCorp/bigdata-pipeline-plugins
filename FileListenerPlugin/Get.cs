@@ -99,46 +99,49 @@ namespace FileListenerPlugin
                 {
                     _logger.Log("Files found: " + files.Count);
                     
-                    _logger.Log("Downloading files to folder");
+                    _logger.Debug("Downloading files to folder");
+
                     // TODO: what happens if move fails?
                     foreach (var f in files)
                     {
                         // Download file
-                        var downloadFrom = System.IO.Path.Combine(parsedInput.FilePath, System.IO.Path.GetFileName(f));
                         var downloadTo = System.IO.Path.Combine(physicalDownloadPath, System.IO.Path.GetFileName(f));
-                        var ret = _s3.DownloadFile(downloadFrom, downloadTo);
+                        var ret = _s3.DownloadFile(f, downloadTo);
                         // Download succeeded 
                         if (ret)
                         {
                             // If backup folder exists, move file
-                            if (!String.IsNullOrEmpty(parsedBackupLocation.FilePath))
+                            if (!String.IsNullOrEmpty (parsedBackupLocation.FilePath))
                             {
-                                var BackupDestName = System.IO.Path.Combine(parsedBackupLocation.FilePath, System.IO.Path.GetFileName(f));
-                                _s3.MoveFile(f, BackupDestName, false);
+                                var BackupDestName = System.IO.Path.Combine (parsedBackupLocation.FilePath, System.IO.Path.GetFileName (f));
+                                _s3.MoveFile (f, BackupDestName, false);
                             }
                             // If DeleSource is set
                             if (deleteSourceFile)
                             {
-                                _s3.DeleteFile(downloadFrom, true);
+                                _s3.DeleteFile (f, true);
                             }
                         }
                         // Download failed 
                         else
-                            _logger.Error("[Error] on downloading file: " + f);
+                        {
+                            _logger.Error (String.Format ("{0} : {1}", String.IsNullOrEmpty (_s3.LastError) ? "Download failed" : _s3.LastError, f));
+                            return false;
+                        }
                     }
                     _logger.Success("Done");
                     return true;
                 }
                 else
                 {
-                    _logger.Success("No Files Found on: " + searchPath);
+                    _logger.Debug("No Files Found on: " + searchPath);
                     return true;
                 }
             }
             catch (Exception ex)
             {
                 _lastError = ex.Message;
-                _logger.Error("[Error] " + _lastError);
+                _logger.Error("[ex] " + _lastError);
                 try
                 {
                     if (files != null && _s3 != null)

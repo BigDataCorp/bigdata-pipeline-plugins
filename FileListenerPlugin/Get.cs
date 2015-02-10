@@ -1,5 +1,4 @@
-﻿using AWSRedshiftPlugin;
-using BigDataPipeline.Interfaces;
+﻿using BigDataPipeline.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,19 +20,29 @@ namespace FileListenerPlugin
 
         public Get()
         {
-            Name        = "DownloadPlugin";
-            Description = "Download Plugin";
+            Name = "FileListenerGet";
+            Description = "File Listener Get Plugin";
         }
 
         public IEnumerable<PluginParameterDetails> GetParameterDetails()
         {
             yield return new PluginParameterDetails("awsAccessKey", typeof(string), "AWS Access key for S3 usage");
             yield return new PluginParameterDetails("awsSecretAccessKey", typeof(string), "AWS Secret Access key for S3 usage");
+            
             yield return new PluginParameterDetails("searchPath", typeof(string), "search s3 path for files");
+            
+            
             yield return new PluginParameterDetails("physicalDownloadPath", typeof(string), "physical path to download file");
             yield return new PluginParameterDetails("backupLocation", typeof(string), "folder location to copy backup files");
             yield return new PluginParameterDetails("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
             yield return new PluginParameterDetails("errorLocation", typeof(string), "s3 errorLocation");
+            
+            yield return new PluginParameterDetails ("sshKeyFiles", typeof (string), "List of ssh key files for sftp");
+
+            yield return new PluginParameterDetails ("searchTopDirectoryOnly", typeof (bool), "Search for files on top directory or recursively");
+
+            yield return new PluginParameterDetails ("retryCount", typeof (int), "");
+            yield return new PluginParameterDetails ("retryWaitMs", typeof (int), "");
         }
 
         public string GetLastError()
@@ -62,7 +71,7 @@ namespace FileListenerPlugin
         {
             _lastError = null;
             List<string> files = null;
-            FileSearchDetails parsedErrorLocation = null;
+            FileTransferDetails parsedErrorLocation = null;
             try
             {
                 var searchPath = _options.Get("searchPath", "");
@@ -85,12 +94,12 @@ namespace FileListenerPlugin
                 var deleteSourceFile = _options.Get<bool>("deleteSourceFile", false);
                 
                 // prepare paths
-                var parsedInput = FileSearchDetails.ParseSearchPath(searchPath);
-                var parsedBackupLocation = FileSearchDetails.ParseSearchPath(backupLocation);
-                parsedErrorLocation = FileSearchDetails.ParseSearchPath(errorLocation);
+                var parsedInput = FileTransferDetails.ParseSearchPath (searchPath);
+                var parsedBackupLocation = FileTransferDetails.ParseSearchPath (backupLocation);
+                parsedErrorLocation = FileTransferDetails.ParseSearchPath (errorLocation);
 
                 // open s3 connection
-                _s3 = new AWSS3Helper(_options.Get("awsAccessKey", ""), _options.Get("awsSecretAccessKey", ""), parsedInput.BucketName, Amazon.RegionEndpoint.USEast1, true);
+                _s3 = new AWSS3Helper (_options.Get ("awsAccessKey", ""), _options.Get ("awsSecretAccessKey", ""), parsedInput.Get ("bucketName", ""), Amazon.RegionEndpoint.USEast1, true);
 
                 // 1. check if there is any new file                
                 files = GetFilesFromS3(_s3, parsedInput).Where(f => !f.EndsWith("/")).ToList();
@@ -157,7 +166,7 @@ namespace FileListenerPlugin
             }
         }
 
-        private IEnumerable<string> GetFilesFromS3(AWSS3Helper s3, FileSearchDetails parsed)
+        private IEnumerable<string> GetFilesFromS3 (AWSS3Helper s3, FileTransferDetails parsed)
         {
             // get file from s3
             if (parsed.UseWildCardSearch)

@@ -1,4 +1,5 @@
 ﻿using BigDataPipeline;
+using BigDataPipeline.Core.Interfaces;
 using BigDataPipeline.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -13,7 +14,7 @@ namespace PipelineJobLoader
         string _lastError;
         string _inputPath;
         string _backupPath;
-        IStorageContext _storageContext;
+        IStorageModule _storageContext;
         ActionLogger _logger;
         ISessionContext _context;
 
@@ -35,7 +36,7 @@ namespace PipelineJobLoader
             yield return new PluginParameterDetails ("JobLoader.awsSecretAccessKey", typeof (string), "AWS Secret Access key for S3 usage");
         }
 
-        public void SetSystemParameters (IStorageContext storageContext)
+        public void SetSystemParameters (IStorageModule storageContext)
         {
             _storageContext = storageContext;
         }

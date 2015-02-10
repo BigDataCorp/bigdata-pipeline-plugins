@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace AWSRedshiftPlugin
 {
-    public class FileSearchDetails
+    public class FileTransferDetails
     {
         public enum FileLocation { FileSystem, S3, FTP, HTTP }
 
@@ -35,9 +35,9 @@ namespace AWSRedshiftPlugin
         /// </summary>
         public string FilePath { get; set; }
 
-        public static FileSearchDetails ParseSearchPath (string inputSearchPath)
+        public static FileTransferDetails ParseSearchPath (string inputSearchPath)
         {
-            FileSearchDetails obj = new FileSearchDetails ();
+            FileTransferDetails obj = new FileTransferDetails ();
             // sanity check
             if (string.IsNullOrWhiteSpace (inputSearchPath))
                 return obj;
@@ -82,7 +82,7 @@ namespace AWSRedshiftPlugin
             return null;
         }
   
-        private static string ParseAwsS3Path (FileSearchDetails obj, string inputSearchPath)
+        private static string ParseAwsS3Path (FileTransferDetails obj, string inputSearchPath)
         {
             inputSearchPath = inputSearchPath.Substring ("s3://".Length);
             // extract bucketname
@@ -90,7 +90,7 @@ namespace AWSRedshiftPlugin
             if (idx < 0)
                 throw new Exception ("Invalid S3 file search path");
 
-            obj.Location = FileSearchDetails.FileLocation.S3;
+            obj.Location = FileTransferDetails.FileLocation.S3;
             obj.BucketName = inputSearchPath.Substring (0, idx);
 
             // find file wildcard:

@@ -86,8 +86,11 @@ namespace MongoDbActionsPlugin
         /// Configures the global connection string for a MongoDB instance/cluster.
         /// </summary>
         /// <param name="connectionString">The connection string builder.</param>
-        public static void Configure (MongoConnectionStringBuilder connectionString)
+        public static void Configure (MongoUrlBuilder connectionString)
         {
+            if (connectionString.ConnectTimeout.TotalSeconds < 30) connectionString.ConnectTimeout = TimeSpan.FromSeconds (30);
+            if (connectionString.SocketTimeout.TotalSeconds < 90) connectionString.SocketTimeout = TimeSpan.FromSeconds (90);
+            connectionString.MaxConnectionIdleTime = TimeSpan.FromSeconds (30);
             // set the new connection string
             Configure (connectionString.ToString ());
         }
@@ -141,6 +144,8 @@ namespace MongoDbActionsPlugin
             return BuildConnectionString (login, password, true, false, addresses, 30000, 90000, databaseName);
         }
 
+        static string[] urlPrefix = new string[] { "mongodb://" };
+
         /// <summary>
         /// Builds the connection string for MongoDB.
         /// </summary>
@@ -155,48 +160,30 @@ namespace MongoDbActionsPlugin
         /// <param name="readPreferenceTags">The read preference tags. List of a comma-separated list of colon-separated key-value pairs. Ex.: { {dc:ny,rack:1}, { dc:ny } } </param>
         public static string BuildConnectionString (string login, string password, bool safeMode, bool readOnSecondary, string addresses, int connectionTimeoutMilliseconds, int socketTimeoutMilliseconds, string databaseName = null, IEnumerable<string> readPreferenceTags = null)
         {
-            StringBuilder sb = new StringBuilder ("mongodb://", 230);
-            // check credentials
-            if (!String.IsNullOrWhiteSpace (login) && !String.IsNullOrWhiteSpace (password))
-            {
-                sb.Append (login).Append (':').Append (password).Append ('@');
-            }
-            // address
-            sb.Append (addresses);
-            // add database name and options
-            if (!String.IsNullOrEmpty (databaseName))
-                sb.Append ('/').Append (databaseName).Append ('?'); 
-            else 
-                sb.Append ("/?");
-            // options
-            //if (isReplicaSet)
-            //    sb.Append ("connect=replicaset&");
-            if (safeMode)
-                sb.Append ("w=1&");
-            else
-                sb.Append ("w=0&");
-            if (readOnSecondary)
-            {
-                sb.Append ("readPreference=secondaryPreferred&");
-            }
-            else
-            {
-                sb.Append ("readPreference=primaryPreferred&");
-            }
+            var cb = new MongoDB.Driver.MongoUrlBuilder ("mongodb://" + addresses.Replace ("mongodb://", ""));
+            cb.Username = login;
+            cb.Password = password;
+            cb.ConnectionMode = MongoDB.Driver.ConnectionMode.Automatic;            
+            cb.W = safeMode ? WriteConcern.W1.W : WriteConcern.Unacknowledged.W;
+
+            if (connectionTimeoutMilliseconds < 15000) connectionTimeoutMilliseconds = 15000;
+            if (socketTimeoutMilliseconds < 15000) socketTimeoutMilliseconds = 15000;
+            cb.ConnectTimeout = TimeSpan.FromMilliseconds (connectionTimeoutMilliseconds);
+            cb.SocketTimeout = TimeSpan.FromMilliseconds (socketTimeoutMilliseconds);
+            
+            cb.MaxConnectionIdleTime = TimeSpan.FromSeconds (30);
+            
+            cb.ReadPreference = new ReadPreference ();
+            cb.ReadPreference.ReadPreferenceMode = readOnSecondary ? ReadPreferenceMode.SecondaryPreferred : ReadPreferenceMode.PrimaryPreferred;
+            
             if (readPreferenceTags != null)
             {
-                foreach (var tag in readPreferenceTags)
-                {
-                    if (String.IsNullOrWhiteSpace (tag))
-                        continue;
-                    sb.Append ("readPreferenceTags=").Append (tag.Trim ().Replace (' ', '_')).Append ('&');
-                }
+                foreach (var tag in readPreferenceTags.Where (i => i != null && i.IndexOf (':') > 0).Select (i => i.Split (':')).Select (i => new ReplicaSetTag (i[0], i[1])))
+                    cb.ReadPreference.AddTagSet (new ReplicaSetTagSet ().Add (tag));                
             }
 
-            sb.Append ("connectTimeoutMS=").Append (connectionTimeoutMilliseconds).Append ("&socketTimeoutMS=").Append (socketTimeoutMilliseconds);
-
             // generate final connection string
-            return sb.ToString ();
+            return cb.ToString ();
         }
 
         private static MongoClient OpenConnection ()
@@ -241,8 +228,11 @@ namespace MongoDbActionsPlugin
         /// </summary>
         /// <param name="connectionString">The connection string.</param>
         /// <returns></returns>
-        public static MongoServer GetServer (MongoConnectionStringBuilder connectionString)
-        { 
+        public static MongoServer GetServer (MongoUrlBuilder connectionString)
+        {
+            if (connectionString.ConnectTimeout.TotalSeconds < 30) connectionString.ConnectTimeout = TimeSpan.FromSeconds (30);
+            if (connectionString.SocketTimeout.TotalSeconds < 90) connectionString.SocketTimeout = TimeSpan.FromSeconds (90);
+            connectionString.MaxConnectionIdleTime = TimeSpan.FromSeconds (30);
             return GetServer (connectionString.ToString ());
         }
 
@@ -274,7 +264,7 @@ namespace MongoDbActionsPlugin
         /// <param name="dbName">Name of the db.</param>
         /// <param name="connectionString">The connection string to the MongoDB instance/cluster.</param>
         /// <returns></returns>
-        public static MongoDatabase GetDatabase (string dbName, MongoConnectionStringBuilder connectionString)
+        public static MongoDatabase GetDatabase (string dbName, MongoUrlBuilder connectionString)
         {
             return GetDatabase (dbName, connectionString.ToString ());
         }
@@ -319,6 +309,13 @@ namespace MongoDbActionsPlugin
                     if (col.Insert (item).Ok)
                         return true;
                 }
+                catch (MongoDuplicateKeyException dup)
+                {
+                    // duplicate id exception (no use to retry)
+                    if (ignoreDuplicates) return true;
+                    if (throwOnError) throw;
+                    break;
+                }
                 catch (WriteConcernException wcEx)
                 {
                     // duplicate id exception (no use to retry)
@@ -335,7 +332,7 @@ namespace MongoDbActionsPlugin
                         throw;
                 }
                 // System.IO.IOException ex
-                catch (System.Exception exAll)
+                catch
                 {
                     if (throwOnError && done > (retryCount - 1))
                         throw;

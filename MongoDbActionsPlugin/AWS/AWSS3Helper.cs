@@ -1265,6 +1265,48 @@ namespace MongoDbActionsPlugin
             }
             return response;
         }
+
+        public bool DeleteFiles (IList<string> keys, bool throwOnError = false)
+        {
+            try
+            {
+                int maxTries = ((int)(keys.Count / 1000)) + 2;
+                int tryCount = 0;
+                int errorCounter = 0;
+                while (keys != null && keys.Count > 0 && tryCount++ < maxTries)
+                {
+                    var p = new DeleteObjectsRequest ();
+                    p.BucketName = _bucketName;
+                    p.Quiet = true;
+                    foreach (var key in keys.Take (999))
+                        p.AddKey (PrepareS3KeyStyle (key));                    
+                    
+                    try
+                    {
+                        var response = _client.DeleteObjects (p);
+
+                        keys = keys.Skip (999)
+                            .Concat (response.DeleteErrors.Select (i => i.Key)).ToArray ();
+                    }
+                    catch (AmazonS3Exception ex)
+                    {
+                        if (++errorCounter > 3)
+                            throw ex;
+                        continue;
+                    }
+
+                    errorCounter = 0;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (throwOnError)
+                    throw ex;
+                LastError = ex.Message;
+            }
+            return false;
+        }
         
         /// <summary>
         /// Deletes Folder files and subfolders in the path.
@@ -1273,15 +1315,13 @@ namespace MongoDbActionsPlugin
         {
             try
             {
-                IEnumerable<string> filesList = GetFileList (folderPath, true, true);
+                IEnumerable<string> filesList = GetFileList (folderPath, true, true, false);
                 bool res = true;
-                foreach (var item in filesList)
+                var list = filesList.Take (990).ToList ();
+                while (list != null && list.Count > 0)
                 {
-                    bool deleted = DeleteFile (folderPath, item, true);
-                    if (deleted == false)
-                    {
-                        res = false;
-                    }
+                    DeleteFiles (list, true);
+                    list = filesList.Take (990).ToList ();
                 }
                 return res;
             }

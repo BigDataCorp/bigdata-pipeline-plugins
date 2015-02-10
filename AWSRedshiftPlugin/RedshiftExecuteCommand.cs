@@ -74,8 +74,8 @@ namespace AWSRedshiftPlugin
                 }
 
                 // prepare paths
-                var parsedLoadScript = FileSearchDetails.ParseSearchPath (loadScript);                
-                var parsedCustomCSharpScriptPath = FileSearchDetails.ParseSearchPath (customCSharpScriptPath);
+                var parsedLoadScript = FileTransferDetails.ParseSearchPath (loadScript);                
+                var parsedCustomCSharpScriptPath = FileTransferDetails.ParseSearchPath (customCSharpScriptPath);
 
                 // open s3 connection
                 _s3 = new AWSS3Helper (_options.Get ("awsAccessKey", ""), _options.Get ("awsSecretAccessKey", ""), parsedLoadScript.BucketName, Amazon.RegionEndpoint.USEast1, true);

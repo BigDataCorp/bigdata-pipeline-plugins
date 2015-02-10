@@ -65,7 +65,7 @@ namespace AWSRedshiftPlugin
         {
             _lastError = null;
             List<string> files = null;
-            FileSearchDetails parsedErrorLocation = null;
+            FileTransferDetails parsedErrorLocation = null;
             try
             {
                 var inputSearchPath = _options.Get ("inputSearchPath", "");
@@ -85,10 +85,10 @@ namespace AWSRedshiftPlugin
                     throw new ArgumentNullException ("errorLocation");
 
                 // prepare paths
-                var parsedInput = FileSearchDetails.ParseSearchPath (inputSearchPath);
-                var parsedLoadScript = FileSearchDetails.ParseSearchPath (loadScript);
-                var parsedBackupLocation = FileSearchDetails.ParseSearchPath (backupLocation);
-                parsedErrorLocation = FileSearchDetails.ParseSearchPath (errorLocation);
+                var parsedInput = FileTransferDetails.ParseSearchPath (inputSearchPath);
+                var parsedLoadScript = FileTransferDetails.ParseSearchPath (loadScript);
+                var parsedBackupLocation = FileTransferDetails.ParseSearchPath (backupLocation);
+                parsedErrorLocation = FileTransferDetails.ParseSearchPath (errorLocation);
                 
                 // open s3 connection
                 _s3 = new AWSS3Helper (_options.Get ("awsAccessKey", ""), _options.Get ("awsSecretAccessKey", ""), parsedInput.BucketName, Amazon.RegionEndpoint.USEast1, true);
@@ -145,7 +145,7 @@ namespace AWSRedshiftPlugin
             return true;
         }
   
-        private void ExecuteRedshiftLoad (string script, List<string> files, FileSearchDetails filesDetails)
+        private void ExecuteRedshiftLoad (string script, List<string> files, FileTransferDetails filesDetails)
         {
             var dtStart = DateTime.UtcNow;
 
@@ -202,7 +202,7 @@ namespace AWSRedshiftPlugin
             _logger.Log ("Files loaded");
         }
         
-        private IEnumerable<string> GetFilesFromS3 (AWSS3Helper s3, FileSearchDetails parsed)
+        private IEnumerable<string> GetFilesFromS3 (AWSS3Helper s3, FileTransferDetails parsed)
         {            
             // connect to s3
 

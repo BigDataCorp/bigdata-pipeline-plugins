@@ -33,10 +33,11 @@
   <ItemGroup>
     <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\BigDataPipeline.Interface.1.5.1\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.6.2\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
-    <Reference Include="NCrontab">
-      <HintPath>..\packages\ncrontab.1.0.0\lib\NCrontab.dll</HintPath>
+    <Reference Include="NCrontab, Version=2.0.16709.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\ncrontab.2.0.0\lib\net20\NCrontab.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>

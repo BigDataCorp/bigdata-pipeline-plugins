@@ -10,22 +10,14 @@ namespace ProcessRunnerPlugin
 {
     public class Task : IActionModule
     {
-        string _lastError;
-        Record _options;
-        ActionLogger _logger;
-        ISessionContext _context;
+        IActionLogger _logger;
         Process _task;
         bool fireAndForget;
 
-        public string Name { get; private set; }
-
-        public string Description { get; private set; }
-
-        public Task ()
+        public string GetDescription ()
         {
-            Name = "Task";
-            Description = "Task";
-        }
+            return "Executes any program";
+        }   
 
         public IEnumerable<PluginParameterDetails> GetParameterDetails ()
         {
@@ -36,26 +28,10 @@ namespace ProcessRunnerPlugin
             yield return new PluginParameterDetails ("fireAndForget", typeof (bool), "If the process should be started and left alone aftwards", false);
         }
 
-        public void CleanUp ()
+        public bool Execute (ISessionContext context)
         {
-            
-        }
-
-        public string GetLastError ()
-        {
-            return _lastError;
-        }        
-
-        public void SetParameters (Record options, ISessionContext context)
-        {
-            _context = context;
-            _options = options;
-            _logger = _context.GetLogger ();
-        }
-
-        public bool Execute (params IEnumerable<Record>[] dataStreams)
-        {
-            _lastError = null;
+            _logger = context.GetLogger ();
+            var _options = context.Options;
 
             try
             {
@@ -80,7 +56,8 @@ namespace ProcessRunnerPlugin
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
+                context.Error = ex.Message;
+                _logger.Error (ex);
                 return false;
             }
         }
@@ -208,7 +185,7 @@ namespace ProcessRunnerPlugin
 
                 // log last lines
                 if (infoHead.Count > 0)
-                    _logger.Log ("Output:\n" + String.Join ("\n", infoHead) + "\n(...)\n" + String.Join ("\n", infoTail));
+                    _logger.Info ("Output:\n" + String.Join ("\n", infoHead) + "\n(...)\n" + String.Join ("\n", infoTail));
 
                 // check exit code
                 try
@@ -218,7 +195,7 @@ namespace ProcessRunnerPlugin
                     else if (_task.ExitCode < 0)
                         _logger.Error ("ExitCode: " + _task.ExitCode);
                     else
-                        _logger.Log ("ExitCode: " + _task.ExitCode);
+                        _logger.Info ("ExitCode: " + _task.ExitCode);
                 } 
                 catch
                 {
@@ -279,7 +256,7 @@ namespace ProcessRunnerPlugin
             string strMessage = e.Data;
             if (!String.IsNullOrWhiteSpace (strMessage))
             {
-                if (!_logger.IsTracingEnabled)
+                if (_logger.GetLogLevel () > ActionLogLevel.Debug)
                 {
                     if (infoHead.Count < 3)
                     {

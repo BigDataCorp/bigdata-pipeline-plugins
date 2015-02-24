@@ -10,22 +10,12 @@ using System.Threading.Tasks;
 namespace PipelineJobLoader
 {
     public class JobLoader : ISystemModule
-    {
-        string _lastError;
-        string _inputPath;
-        string _backupPath;
+    {        
         IStorageModule _storageContext;
-        ActionLogger _logger;
-        ISessionContext _context;
 
-        public string Name { get; private set; }
-
-        public string Description { get; private set; }
-
-        public JobLoader ()
+        public string GetDescription ()
         {
-            Name = "JobLoader";
-            Description = "Load jobs from a text file and updates the system jobs database";
+            return "Load jobs from a text file and updates the system jobs database";
         }
 
         public IEnumerable<PluginParameterDetails> GetParameterDetails ()
@@ -36,98 +26,79 @@ namespace PipelineJobLoader
             yield return new PluginParameterDetails ("JobLoader.awsSecretAccessKey", typeof (string), "AWS Secret Access key for S3 usage");
         }
 
-        public void SetSystemParameters (IStorageModule storageContext)
-        {
-            _storageContext = storageContext;
-        }
-
-        public void SetParameters (Record options, ISessionContext context)
-        {
-            _context = context;
-            _logger = _context.GetLogger ();
-            _inputPath = options.Get ("JobLoader.SearchPath", System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Jobloader", "Input", "*"));
-            _backupPath = options.Get ("JobLoader.BackupPath", System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Jobloader", "Backup"));
-        }        
-
-        public string GetLastError ()
-        {
-            return _lastError;
-        }
-
-        public void CleanUp ()
+        public PipelineJob GetJobRegistrationDetails ()
         {            
-        }
-
-        public PipelineCollection GetJobDetails ()
-        {
-            var c= new PipelineCollection
+            var c = new PipelineJob
             {
                 Id = this.GetType ().FullName,
                 Name = this.GetType ().Name,
                 Domain = "System",
                 Enabled = true,
-                Jobs = new List<PipelineJob>
+                Scheduler = new List<string> { "*/30 * * * *" },
+                NextExecution = DateTime.UtcNow,
+                RootAction = new ActionDetails
                 {
-                    new PipelineJob ()
-                    {                        
-                        Enabled = true,
-                        Scheduler = new List<string> {"*/30 * * * *"},
-                        NextExecution = DateTime.UtcNow,
-                        RootAction = new ActionDetails
-                        {
-                            PluginId = this.GetType ().FullName,
-                            Type = PluginTypes.SystemModule
-                        }
-                    }
+                    Module = this.GetType ().FullName,
+                    Type = ModuleTypes.SystemModule
                 }
-                
             };
             return c;
         }
 
-        public bool Execute (params IEnumerable<Record>[] dataStreams)
+        public void SetSystemParameters (IStorageModule storageContext)
         {
+            _storageContext = storageContext;
+        }
+
+        public bool Execute (ISessionContext context)
+        {
+            var logger = context.GetLogger ();
+            var options = context.Options;            
+
             try
             {
-                if (String.IsNullOrEmpty (_inputPath))
+                var inputPath = options.Get ("JobLoader.SearchPath", System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Jobloader", "Input", "*"));
+                var backupPath = options.Get ("JobLoader.BackupPath", System.IO.Path.Combine (AppDomain.CurrentDomain.BaseDirectory, "Jobloader", "Backup"));
+
+                if (String.IsNullOrEmpty (inputPath))
                     throw new ArgumentNullException ("JobLoader.SearchPath");
                 var searchOptions = System.IO.SearchOption.AllDirectories;
-                var dir = System.IO.Path.GetDirectoryName (_inputPath);
-                var searchPattern = System.IO.Path.GetFileName (_inputPath);
+                var dir = System.IO.Path.GetDirectoryName (inputPath);
+                var searchPattern = System.IO.Path.GetFileName (inputPath);
                 foreach (var f in System.IO.Directory.EnumerateFiles (dir, searchPattern, searchOptions).ToList ())
                 {
-                    _logger.Log ("File found: " + f);
+                    logger.Info ("File found: " + f);
                     // load and parse file content
                     var encoding = SimpleHelpers.FileEncoding.DetectFileEncoding (f);
                     if (encoding == null)
                     {
-                        _logger.Log ("Ignoring file: could not detect file encoding");  
+                        logger.Debug ("Ignoring file: could not detect file encoding");  
                         continue;
                     }
-                    var json = System.IO.File.ReadAllText (f, Encoding.GetEncoding (encoding));
-                    var item = Newtonsoft.Json.JsonConvert.DeserializeObject<PipelineCollection> (json);
+                    var json = System.IO.File.ReadAllText (f, encoding);
+                    var item = Newtonsoft.Json.JsonConvert.DeserializeObject<PipelineJob> (json);
 
                     // save to database
                     if (item != null)
                     {
-                        foreach (var i in item.Jobs)
-                            i.SetScheduler (i.Scheduler != null ? i.Scheduler.ToArray () : new string[0]);
+                        item.SetScheduler (item.Scheduler != null ? item.Scheduler.ToArray () : new string[0]);
                         _storageContext.SavePipelineCollection (item);
-                        _logger.Log ("Pipeline imported: " + item.Id);
+                        logger.Info ("Pipeline imported: " + item.Id);
                     }
                     
                     // move file
-                    if (!String.IsNullOrEmpty (_backupPath))
+                    if (!String.IsNullOrEmpty (backupPath))
                     {
-                        (new System.IO.DirectoryInfo (_backupPath)).Create ();
-                        System.IO.File.Move (f, System.IO.Path.Combine (_backupPath, System.IO.Path.GetFileName (f)));
-                        _logger.Log ("File moved to backup folder");
+                        (new System.IO.DirectoryInfo (backupPath)).Create ();
+                        System.IO.File.Move (f, System.IO.Path.Combine (backupPath, System.IO.Path.GetFileName (f)));
+                        logger.Debug ("File moved to backup folder");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
+                context.Error = ex.Message;
+                logger.Error (ex);
                 return false;                
             }
 

@@ -9,31 +9,10 @@ namespace NotificationsPlugin
 {
     public class NotificationHandler : IActionModule
     {
-        #region ** Private Attributes **
-
-        private string       _lastError; // Holds the Last Error Message
-        private ActionLogger _logger;    // 
-        private Record       _options;   // Parameters passed to this Plugin
-        ISessionContext _context;
-
-        #endregion
-
-        #region ** Public Attributes **
-
-        public string Description { get; private set; }
-
-        public string Name        { get; private set; }
-
-        #endregion
-
-        /// <summary>
-        /// Class Constructor
-        /// </summary>
-        public NotificationHandler ()
+        public string GetDescription ()
         {
-            Name        = "Notifications Plugin ";
-            Description = "Plugin used to send emails, SMS or to make phone calls";
-        }
+            return "Plugin used to send emails, SMS or to make phone calls";
+        } 
 
         /// <summary>
         /// Gets the Descriptions of the parameters that this plugin
@@ -58,42 +37,29 @@ namespace NotificationsPlugin
         }
 
         /// <summary>
-        /// Sets the Parameters and Logger for this plugin
-        /// </summary>
-        /// <param name="options">Plugin Parameters</param>
-        /// <param name="context">The context.</param>
-        public void SetParameters (Record options, ISessionContext context)
-        {
-            _context = context;
-            _options = options;
-            _logger = _context.GetLogger ();
-        }
-
-        /// <summary>
         /// Implements this plugin execution's logic
         /// </summary>
-        /// <param name="dataStreams"></param>
-        /// <returns></returns>
-        public bool Execute (params IEnumerable<Record>[] dataStreams)
+        public bool Execute (ISessionContext context)
         {
-            _lastError = null;
+            var logger = context.GetLogger ();
+            var options = context.Options;
 
             try
             {
                 // Parsing Parameters
-                String notificationType = _options.Get ("NotificationType", "EMAIL");
-                String contacts         = _options.Get ("Contacts",         String.Empty);   
-                String subject          = _options.Get ("Subject",          String.Empty);   
-                String message          = _options.Get ("Message",          String.Empty);
+                String notificationType = options.Get ("NotificationType", "EMAIL");
+                String contacts         = options.Get ("Contacts",         String.Empty);   
+                String subject          = options.Get ("Subject",          String.Empty);   
+                String message          = options.Get ("Message",          String.Empty);
 
                 // Email Specific Configurations
-                String EmailFrom     = _options.Get ("EmailFrom",     String.Empty);
-                String EmailLogin    = _options.Get ("EmailLogin",    String.Empty);
-                String EmailPassword = _options.Get ("EmailPassword", String.Empty);
-                String EmailSmtp     = _options.Get ("EmailSmtp",     "");
-                int    EmailPort     = _options.Get ("EmailPort",     587); // Gmail port is the default
-                bool   EmailSsl      = _options.Get ("EmailSsl",      false);
-                bool   EmailIsHtml   = _options.Get ("EmailIsHtml",   false);
+                String EmailFrom     = options.Get ("EmailFrom",     String.Empty);
+                String EmailLogin    = options.Get ("EmailLogin",    String.Empty);
+                String EmailPassword = options.Get ("EmailPassword", String.Empty);
+                String EmailSmtp     = options.Get ("EmailSmtp",     "");
+                int    EmailPort     = options.Get ("EmailPort",     587); // Gmail port is the default
+                bool   EmailSsl      = options.Get ("EmailSsl",      false);
+                bool   EmailIsHtml   = options.Get ("EmailIsHtml",   false);
 
                 // Setting up Configuration
                 NotificationService.Configuration = new NotificationConfig ()
@@ -134,35 +100,17 @@ namespace NotificationsPlugin
                 // Checking for error
                 if (!notificationResponse.Status)
                 {
-                    _logger.Error("Error Sending Email:" + notificationResponse.Message);
+                    logger.Error("Error Sending Email:" + notificationResponse.Message);
                 }
 
                 return notificationResponse.Status;
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
-                _logger.Error ("[ex] " + _lastError);
+                context.Error = ex.Message;
+                logger.Error (ex);
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Gets the Last Error Message
-        /// </summary>
-        /// <returns></returns>
-        public string GetLastError ()
-        {
-            return _lastError;
-        }
-
-        /// <summary>
-        /// CleanUp Method for this plugin, that should
-        /// reset any needed attribute / instance
-        /// </summary>
-        public void CleanUp ()
-        {
-            _lastError = String.Empty;
         }
     }
 }

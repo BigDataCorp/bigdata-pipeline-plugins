@@ -36,8 +36,9 @@ namespace AWSRedshiftPlugin
             }
         }
 
-        public static string GetConnectionString (BigDataPipeline.Interfaces.Record options)
+        public static string GetConnectionString (BigDataPipeline.Interfaces.ISessionContext context)
         {
+            var options = context.Options;
             // Create a PostgeSQL connection string.
             var csb = new Npgsql.NpgsqlConnectionStringBuilder ();
             csb.Host = options.Get ("awsRedshiftHost", "");

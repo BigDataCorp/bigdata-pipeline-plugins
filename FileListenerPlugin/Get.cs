@@ -10,19 +10,10 @@ namespace FileListenerPlugin
 {
     public class Get : IActionModule
     {
-        string _lastError;
-
-        public enum LoadTypes { Incremental }
-
-        public string Name { get; private set; }
-
-        public string Description { get; private set; }
-
-        public Get()
+        public string GetDescription ()
         {
-            Name = "FileListenerGet";
-            Description = "File Listener Get Plugin";
-        }
+            return "File Listener Get Module for detecting and downloading files";
+        }        
 
         public IEnumerable<PluginParameterDetails> GetParameterDetails()
         {
@@ -44,32 +35,13 @@ namespace FileListenerPlugin
             yield return new PluginParameterDetails ("retryCount", typeof (int), "");
             yield return new PluginParameterDetails ("retryWaitMs", typeof (int), "");
         }
-
-        public string GetLastError()
+        
+        public bool Execute(ISessionContext context)
         {
-            return _lastError;
-        }
+            var _logger = context.GetLogger ();
+            var _options = context.Options;
+            AWSS3Helper _s3 = null;
 
-        public void CleanUp()
-        {
-
-        }
-
-        Record       _options;
-        ActionLogger _logger;
-        AWSS3Helper  _s3;
-        ISessionContext _context;
-
-        public void SetParameters (Record options, ISessionContext context)
-        {
-            _context = context;
-            _options = options;
-            _logger = _context.GetLogger ();
-        }
-
-        public bool Execute(params IEnumerable<Record>[] dataStreams)
-        {
-            _lastError = null;
             List<string> files = null;
             FileTransferDetails parsedErrorLocation = null;
             try
@@ -106,7 +78,7 @@ namespace FileListenerPlugin
 
                 if (files.Any())
                 {
-                    _logger.Log("Files found: " + files.Count);
+                    _logger.Info("Files found: " + files.Count);
                     
                     _logger.Debug("Downloading files to folder");
 
@@ -149,8 +121,8 @@ namespace FileListenerPlugin
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
-                _logger.Error("[ex] " + _lastError);
+                context.Error = ex.Message;
+                _logger.Error (ex);
                 try
                 {
                     if (files != null && _s3 != null)

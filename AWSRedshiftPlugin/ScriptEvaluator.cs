@@ -114,7 +114,7 @@ namespace AWSRedshiftPlugin
 
     public interface IAWSRedshiftPluginDynamicScript
     {
-        void Initialize (DbConnection connection, AWSS3Helper s3, ActionLogger logger, BigDataPipeline.Interfaces.Record options);
+        void Initialize (DbConnection connection, AWSS3Helper s3, ISessionContext context);
 
         void BeforeExecution ();
 

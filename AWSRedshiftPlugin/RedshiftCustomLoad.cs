@@ -9,19 +9,12 @@ using Dapper;
 namespace AWSRedshiftPlugin
 {
     public class RedshiftCustomLoad : IActionModule
-    {
-        string _lastError;
+    {        
+        public enum LoadTypes { Incremental }
 
-        public enum LoadTypes { Incremental, }
-
-        public string Name { get; private set; }
-
-        public string Description { get; private set; }
-
-        public RedshiftCustomLoad ()
+        public string GetDescription ()
         {
-            Name = "RedshiftCustomLoad";
-            Description = "Redshift Custom Load";
+            return "Redshift Custom Command";
         }
 
         public IEnumerable<PluginParameterDetails> GetParameterDetails ()
@@ -41,52 +34,33 @@ namespace AWSRedshiftPlugin
             yield return new PluginParameterDetails ("customCSharpScriptPath", typeof (string), "s3 customCSharpScriptPath", true);
         }
 
-        public string GetLastError ()
+        public bool Execute (ISessionContext context)
         {
-            return _lastError;
-        }
+            var logger = context.GetLogger ();
+            var options = context.Options;
+            AWSS3Helper s3 = null;
 
-        public void CleanUp ()
-        {
-
-        }
-
-        Record _options;
-        ActionLogger _logger;
-        AWSS3Helper _s3;
-        ISessionContext _context;
-
-        public void SetParameters (Record options, ISessionContext context)
-        {
-            _context = context;
-            _options = options;
-            _logger = _context.GetLogger ();
-        }
-
-        public bool Execute (params IEnumerable<Record>[] dataStreams)
-        {
-            _lastError = null;
             List<string> files = null;
             FileTransferDetails parsedErrorLocation = null;
             try
             {
-                var inputSearchPath = _options.Get ("inputSearchPath", "");
+                var inputSearchPath = options.Get ("inputSearchPath", "");
                 if (String.IsNullOrEmpty (inputSearchPath))
                     throw new ArgumentNullException ("inputSearchPath");
 
-                var backupLocation = _options.Get ("backupLocation", "");
+                var backupLocation = options.Get ("backupLocation", "");
                 if (String.IsNullOrEmpty (backupLocation))
                     throw new ArgumentNullException ("backupLocation");
 
-                var loadScript  = _options.Get ("sqlScriptPath", "");
+                var loadScript  = options.Get ("sqlScriptPath", "");
                 if (String.IsNullOrEmpty (loadScript))
                     throw new ArgumentNullException ("sqlScriptPath");
 
-                var errorLocation  = _options.Get ("errorLocation", "");
+                var errorLocation  = options.Get ("errorLocation", "");
                 if (String.IsNullOrEmpty (errorLocation))
                     throw new ArgumentNullException ("errorLocation");
 
-                var customCSharpScriptPath  = _options.Get ("customCSharpScriptPath", "");
+                var customCSharpScriptPath  = options.Get ("customCSharpScriptPath", "");
                 if (String.IsNullOrEmpty (customCSharpScriptPath))
                     throw new ArgumentNullException ("customCSharpScriptPath");
 
@@ -98,9 +72,9 @@ namespace AWSRedshiftPlugin
                 var parsedCustomCSharpScriptPath = FileTransferDetails.ParseSearchPath (customCSharpScriptPath);
 
                 // open s3 connection
-                _s3 = new AWSS3Helper (_options.Get ("awsAccessKey", ""), _options.Get ("awsSecretAccessKey", ""), parsedInput.BucketName, Amazon.RegionEndpoint.USEast1, true);
+                s3 = new AWSS3Helper (options.Get ("awsAccessKey", ""), options.Get ("awsSecretAccessKey", ""), parsedInput.BucketName, Amazon.RegionEndpoint.USEast1, true);
 
-                var csharpScript = _s3.ReadFileAsText (parsedCustomCSharpScriptPath.FilePath, true);
+                var csharpScript = s3.ReadFileAsText (parsedCustomCSharpScriptPath.FilePath, true);
 
                 // generate code
                 var evaluator = ScriptEvaluator.CompileAndCreateModel (csharpScript);
@@ -108,62 +82,64 @@ namespace AWSRedshiftPlugin
                     throw new Exception ("Script compilation error. " + (evaluator.Message ?? "<empty>"));
 
                 // 1. check if there is any new file                
-                files = GetFilesFromS3 (_s3, parsedInput).ToList ();
+                files = GetFilesFromS3 (s3, parsedInput).ToList ();
 
                 if (files.Any ())
                 {
-                    _logger.Log ("Files found: " + files.Count);
+                    logger.Info ("Files found: " + files.Count);
                 }
                 else
                 {
-                    _logger.Debug ("No file found");
+                    logger.Debug ("No file found");
                     return false;
                 }
-                    
+
+                var connectionString = RedshiftHelper.GetConnectionString (context);
+
                 foreach (var f in files)
                 {
-                    var sqlScript = _s3.ReadFileAsText (parsedLoadScript.FilePath, true);
+                    var sqlScript = s3.ReadFileAsText (parsedLoadScript.FilePath, true);
 
                     if (String.IsNullOrEmpty (sqlScript))
                         throw new Exception ("invalid sql script");
 
-                    using (var conn = new Npgsql.NpgsqlConnection (RedshiftHelper.GetConnectionString (_options)))
+                    using (var conn = new Npgsql.NpgsqlConnection (connectionString))
                     {
                         conn.Open ();
                         var fullFilename = System.IO.Path.Combine ("s3://", parsedInput.BucketName, f.Trim ()).Replace ('\\', '/');
 
-                        _options.Set ("InputFilename", fullFilename);
-                        evaluator.Model.Initialize (conn, _s3, _logger, _options);
+                        options.Set ("InputFilename", fullFilename);
+                        evaluator.Model.Initialize (conn, s3, context);
 
                         evaluator.Model.BeforeExecution ();
 
                         sqlScript = evaluator.Model.PrepareSqlCOPYCommand (sqlScript);
                         
                         // Create a PostgeSQL connection string.
-                        ExecuteRedshiftLoad (sqlScript, new List<string> () { f }, parsedInput);
-                        _logger.Log ("Moving files to backup folder");
+                        ExecuteRedshiftLoad (connectionString, logger, sqlScript, new List<string> () { f }, parsedInput);
+                        logger.Debug ("Moving files to backup folder");
 
                         evaluator.Model.AfterExecution ();
 
                         // move files                        
                         var destName = System.IO.Path.Combine (parsedBackupLocation.FilePath, System.IO.Path.GetFileName (f));
-                        _s3.MoveFile (f, destName, false);
+                        s3.MoveFile (f, destName, false);
                     }
-                    _logger.Success ("Done");
+                    logger.Success ("Done");
                 }
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
-                _logger.Error ("[ex] " + _lastError);
+                context.Error = ex.Message;
+                logger.Error (ex);
                 try
                 {
-                    if (files != null && _s3 != null)
+                    if (files != null && s3 != null)
                         // move files
                         foreach (var f in files)
                         {
                             var destName = System.IO.Path.Combine (parsedErrorLocation.FilePath, System.IO.Path.GetFileName (f));
-                            _s3.MoveFile (f, destName, false);
+                            s3.MoveFile (f, destName, false);
                         }
                 }
                 catch { }
@@ -173,7 +149,7 @@ namespace AWSRedshiftPlugin
             return true;
         }
 
-        private void ExecuteRedshiftLoad (string script, List<string> files, FileTransferDetails filesDetails)
+        private void ExecuteRedshiftLoad (string connectionString, IActionLogger logger, string script, List<string> files, FileTransferDetails filesDetails)
         {
             var dtStart = DateTime.UtcNow;
 
@@ -182,14 +158,12 @@ namespace AWSRedshiftPlugin
                 .Select (f => System.IO.Path.Combine ("s3://", filesDetails.BucketName, f.Trim ()).Replace ('\\', '/')),
                 StringComparer.OrdinalIgnoreCase);
 
-            // Create a PostgeSQL connection string.
-            var connectionString = RedshiftHelper.GetConnectionString (_options);
-
-            _logger.Log ("SQL Script start");
+            // execute redshift load.
+            logger.Debug ("SQL Script start");
 
             RedshiftHelper.RunLoad (connectionString, script);
 
-            _logger.Log ("SQL Script end");
+            logger.Debug ("SQL Script end");
 
             int num_files = files.Count;
             do
@@ -227,7 +201,7 @@ namespace AWSRedshiftPlugin
                     throw new Exception ("Load error; file not commited <stl_load_commits>: " + f);
             }
 
-            _logger.Log ("Files loaded");
+            logger.Debug ("Files loaded");
         }
   
         private IEnumerable<string> GetFilesFromS3 (AWSS3Helper s3, FileTransferDetails parsed)

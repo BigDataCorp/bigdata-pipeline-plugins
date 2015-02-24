@@ -10,18 +10,11 @@ namespace AWSRedshiftPlugin
 {
     public class RedshiftExecuteCommand : IActionModule
     {
-        string _lastError;
+        public enum LoadTypes { Incremental }
 
-        public enum LoadTypes { Incremental, }
-
-        public string Name { get; private set; }
-
-        public string Description { get; private set; }
-
-        public RedshiftExecuteCommand ()
+        public string GetDescription ()
         {
-            Name = "RedshiftExecuteCommand";
-            Description = "Redshift Execute Command";
+            return "Redshift Execute Command";   
         }
 
         public IEnumerable<PluginParameterDetails> GetParameterDetails ()
@@ -38,35 +31,16 @@ namespace AWSRedshiftPlugin
             yield return new PluginParameterDetails ("customCSharpScriptPath", typeof (string), "[optional] s3 customCSharpScriptPath", true);
         }
 
-        public string GetLastError ()
+        public bool Execute (ISessionContext context)
         {
-            return _lastError;
-        }
+            var logger = context.GetLogger ();
+            var options = context.Options;
+            AWSS3Helper s3 = null;
 
-        public void CleanUp ()
-        {
-
-        }
-
-        Record _options;
-        ActionLogger _logger;
-        AWSS3Helper _s3;
-        ISessionContext _context;
-
-        public void SetParameters (Record options, ISessionContext context)
-        {
-            _context = context;
-            _options = options;
-            _logger = _context.GetLogger ();
-        }
-
-        public bool Execute (params IEnumerable<Record>[] dataStreams)
-        {
-            _lastError = null;
             try
             {
-                var loadScript = _options.Get ("sqlScriptPath", "");                
-                var customCSharpScriptPath = _options.Get ("customCSharpScriptPath", "");                
+                var loadScript = options.Get ("sqlScriptPath", "");                
+                var customCSharpScriptPath = options.Get ("customCSharpScriptPath", "");                
 
                 if ((!String.IsNullOrWhiteSpace (loadScript)) && (!String.IsNullOrWhiteSpace (customCSharpScriptPath)))
                 {
@@ -78,13 +52,13 @@ namespace AWSRedshiftPlugin
                 var parsedCustomCSharpScriptPath = FileTransferDetails.ParseSearchPath (customCSharpScriptPath);
 
                 // open s3 connection
-                _s3 = new AWSS3Helper (_options.Get ("awsAccessKey", ""), _options.Get ("awsSecretAccessKey", ""), parsedLoadScript.BucketName, Amazon.RegionEndpoint.USEast1, true);
+                s3 = new AWSS3Helper (options.Get ("awsAccessKey", ""), options.Get ("awsSecretAccessKey", ""), parsedLoadScript.BucketName, Amazon.RegionEndpoint.USEast1, true);
 
                 // load sql script
                 string sqlScript = null;
                 if (!String.IsNullOrWhiteSpace (loadScript))
                 {
-                    sqlScript = _s3.ReadFileAsText (parsedLoadScript.FilePath, true);
+                    sqlScript = s3.ReadFileAsText (parsedLoadScript.FilePath, true);
                 }
 
                 // generate code
@@ -92,7 +66,7 @@ namespace AWSRedshiftPlugin
                 if (!String.IsNullOrWhiteSpace (customCSharpScriptPath))
                 {
                     // load custom code
-                    var csharpScript = _s3.ReadFileAsText (parsedCustomCSharpScriptPath.FilePath, true);
+                    var csharpScript = s3.ReadFileAsText (parsedCustomCSharpScriptPath.FilePath, true);
 
                     var evaluator = ScriptEvaluator.CompileAndCreateModel (csharpScript);
                     if (evaluator.HasError || evaluator.Model == null)
@@ -101,27 +75,27 @@ namespace AWSRedshiftPlugin
                 }
 
                 // execute commands
-                using (var conn = new Npgsql.NpgsqlConnection (RedshiftHelper.GetConnectionString (_options)))
+                using (var conn = new Npgsql.NpgsqlConnection (RedshiftHelper.GetConnectionString (context)))
                 {
                     conn.Open ();
 
                     if (customCode != null)
                     {
-                        _logger.Log ("Custom csharp code Initialize");
+                        logger.Debug ("Custom csharp code Initialize");
 
-                        customCode.Initialize (conn, _s3, _logger, _options);
+                        customCode.Initialize (conn, s3, context);
 
-                        _logger.Log ("Custom csharp code BeforeExecution");
+                        logger.Debug ("Custom csharp code BeforeExecution");
                         customCode.BeforeExecution ();
 
-                        _logger.Log ("Custom csharp code PrepareSqlCOPYCommand");
+                        logger.Debug ("Custom csharp code PrepareSqlCOPYCommand");
                         if (!String.IsNullOrEmpty (sqlScript))
                             sqlScript = customCode.PrepareSqlCOPYCommand (sqlScript);
                     }
                                         
                     if (!String.IsNullOrEmpty (sqlScript))
                     {
-                        _logger.Log ("SQL command start");
+                        logger.Debug ("SQL command start");
 
                         try
                         {
@@ -134,24 +108,24 @@ namespace AWSRedshiftPlugin
                             {                                
                                 throw ex;
                             }
-                            _logger.Log ("SQL command executed, but is still running (connection timeout)...");
+                            logger.Info ("SQL command executed, but is still running (connection timeout)...");
                         }
 
-                        _logger.Log ("SQL command end");
+                        logger.Debug ("SQL command end");
                     }                    
 
                     if (customCode != null)
                     {
-                        _logger.Log ("Custom csharp code AfterExecution");
+                        logger.Debug ("Custom csharp code AfterExecution");
                         customCode.AfterExecution ();
                     }
                 }
-                _logger.Success ("Done");
+                logger.Success ("Done");
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
-                _logger.Error ("[Error] " + _lastError);                
+                context.Error = ex.Message;
+                logger.Error (ex);
                 return false;
             }
 

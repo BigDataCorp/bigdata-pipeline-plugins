@@ -19,21 +19,21 @@ namespace NotificationsPlugin
         /// will use
         /// </summary>
         /// <returns>List of Plugin Parameters Details</returns>
-        public IEnumerable<PluginParameterDetails> GetParameterDetails ()
+        public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-           yield return new PluginParameterDetails ("NotificationType", typeof (string), "Possible Types: CALL, SMS, EMAIL", true);
-           yield return new PluginParameterDetails ("Contacts", typeof (string), "List of contacts (emails / phones) separated by spaces", true);
-           yield return new PluginParameterDetails ("Subject", typeof (string), "Subject (used in case of email)", false);
-           yield return new PluginParameterDetails ("Message", typeof (string), "Message to be sent on the notification", true); 
+           yield return new ModuleParameterDetails ("notificationType", typeof (string), "Possible Types: CALL, SMS, EMAIL. Defaults to EMAIL.", true);
+           yield return new ModuleParameterDetails ("contacts", typeof (string), "List of contacts (emails / phones) separated by spaces, comma", true);
+           yield return new ModuleParameterDetails ("subject", typeof (string), "Subject (used in case of email)", false);
+           yield return new ModuleParameterDetails ("message", typeof (string), "Message to be sent on the notification", true); 
    
            // Email Specific Parameters
-           yield return new PluginParameterDetails ("EmailFrom", typeof (string), "Address from which the email will be sent", false); 
-           yield return new PluginParameterDetails ("EmailLogin", typeof (string), "Login of the email from which the message will be sent", false); 
-           yield return new PluginParameterDetails ("EmailPassword", typeof (string), "Email dredential password", false); 
-           yield return new PluginParameterDetails ("EmailSmtp", typeof (string), "email smtp server address", false); 
-           yield return new PluginParameterDetails ("EmailPort", typeof (int), "Port of the smtp server", false);
-           yield return new PluginParameterDetails ("EmailSsl", typeof(bool), "True if ssl is enabled, false otherwise", false);
-           yield return new PluginParameterDetails ("EmailIsHtml", typeof(bool), "True if the email contains HTML, false otherwise", false); 
+           yield return new ModuleParameterDetails ("emailFrom", typeof (string), "Address from which the email will be sent", false); 
+           yield return new ModuleParameterDetails ("emailLogin", typeof (string), "Login of the email from which the message will be sent", false); 
+           yield return new ModuleParameterDetails ("emailPassword", typeof (string), "Email dredential password", false); 
+           yield return new ModuleParameterDetails ("emailSmtp", typeof (string), "email smtp server address", false); 
+           yield return new ModuleParameterDetails ("emailPort", typeof (int), "Port of the smtp server", false);
+           yield return new ModuleParameterDetails ("emailSsl", typeof(bool), "True if ssl is enabled, false otherwise", false);
+           yield return new ModuleParameterDetails ("emailIsHtml", typeof(bool), "True if the email contains HTML, false otherwise. Defaults to true.", false); 
         }
 
         /// <summary>
@@ -47,19 +47,19 @@ namespace NotificationsPlugin
             try
             {
                 // Parsing Parameters
-                String notificationType = options.Get ("NotificationType", "EMAIL");
-                String contacts         = options.Get ("Contacts",         String.Empty);   
-                String subject          = options.Get ("Subject",          String.Empty);   
-                String message          = options.Get ("Message",          String.Empty);
+                String notificationType = options.Get ("notificationType", "EMAIL");
+                String contacts         = options.Get ("contacts",         String.Empty);   
+                String subject          = options.Get ("subject",          String.Empty);   
+                String message          = options.Get ("message",          String.Empty);
 
                 // Email Specific Configurations
-                String EmailFrom     = options.Get ("EmailFrom",     String.Empty);
-                String EmailLogin    = options.Get ("EmailLogin",    String.Empty);
-                String EmailPassword = options.Get ("EmailPassword", String.Empty);
-                String EmailSmtp     = options.Get ("EmailSmtp",     "");
-                int    EmailPort     = options.Get ("EmailPort",     587); // Gmail port is the default
-                bool   EmailSsl      = options.Get ("EmailSsl",      false);
-                bool   EmailIsHtml   = options.Get ("EmailIsHtml",   false);
+                String EmailFrom     = options.Get ("emailFrom",     String.Empty);
+                String EmailLogin    = options.Get ("emailLogin",    String.Empty);
+                String EmailPassword = options.Get ("emailPassword", String.Empty);
+                String EmailSmtp     = options.Get ("emailSmtp",     "");
+                int    EmailPort     = options.Get ("emailPort",     587); // Gmail port is the default
+                bool   EmailSsl      = options.Get ("emailSsl",      false);
+                bool   EmailIsHtml   = options.Get ("emailIsHtml",   true);
 
                 // Setting up Configuration
                 NotificationService.Configuration = new NotificationConfig ()
@@ -76,7 +76,7 @@ namespace NotificationsPlugin
                 // Picking up Notification Type
                 NotificationTypes notifType = NotificationTypes.EMAIL;
 
-                switch (notificationType.ToUpper())
+                switch (notificationType.ToUpperInvariant())
                 {
                     case "SMS":
                         notifType = NotificationTypes.SMS;
@@ -92,7 +92,7 @@ namespace NotificationsPlugin
                 }
 
                 // Parsing Contacts List
-                List<String> contactsList = contacts.Split (' ').ToList();
+                List<String> contactsList = contacts.Split (' ', ',', ';', '|').Where (i => !String.IsNullOrEmpty(i)).ToList();
 
                 // Sending Notification
                 var notificationResponse = NotificationService.Send (notifType, contactsList, message, subject);

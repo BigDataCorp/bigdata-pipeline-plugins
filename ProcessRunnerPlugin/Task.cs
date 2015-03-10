@@ -13,19 +13,20 @@ namespace ProcessRunnerPlugin
         IActionLogger _logger;
         Process _task;
         bool fireAndForget;
+        int _maxLogLines = 0;
 
         public string GetDescription ()
         {
             return "Executes any program";
         }   
 
-        public IEnumerable<PluginParameterDetails> GetParameterDetails ()
+        public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new PluginParameterDetails ("processFilename", typeof (string), "Filename of the executable file (.exe, .bat etc) to be called", true);
-            yield return new PluginParameterDetails ("parameters", typeof (string), "Process parameters in command line style (separated by spaces and may be surrounded by quotation marks)", false);
-            yield return new PluginParameterDetails ("waitInSeconds", typeof (string), "Wait timeout in seconds for the process finalization. If none or 0 than it will wait until the process finish.", false);
-            yield return new PluginParameterDetails ("processWorkingDirectory", typeof (string), "Working directory for the process. If none is providade, the default value is the same directory of the executing file", false);
-            yield return new PluginParameterDetails ("fireAndForget", typeof (bool), "If the process should be started and left alone aftwards", false);
+            yield return new ModuleParameterDetails ("processFilename", typeof (string), "Filename of the executable file (.exe, .bat etc) to be called", true);
+            yield return new ModuleParameterDetails ("parameters", typeof (string), "Process parameters in command line style (separated by spaces and may be surrounded by quotation marks)", false);
+            yield return new ModuleParameterDetails ("waitInSeconds", typeof (string), "Wait timeout in seconds for the process finalization. If none or 0 than it will wait until the process finish.", false);
+            yield return new ModuleParameterDetails ("processWorkingDirectory", typeof (string), "Working directory for the process. If none is providade, the default value is the same directory of the executing file", false);
+            yield return new ModuleParameterDetails ("fireAndForget", typeof (bool), "If the process should be started and left alone aftwards", false);
         }
 
         public bool Execute (ISessionContext context)
@@ -46,6 +47,9 @@ namespace ProcessRunnerPlugin
                 }
 
                 fireAndForget = _options.Get ("fireAndForget", false);
+                // save ammount of log to produce
+                _maxLogLines = 10 - (int)_logger.GetLogLevel ();
+
 
                 return ExecuteProcess (processFilename,
                     _options.Get ("parameters", ""),
@@ -256,15 +260,15 @@ namespace ProcessRunnerPlugin
             string strMessage = e.Data;
             if (!String.IsNullOrWhiteSpace (strMessage))
             {
-                if (_logger.GetLogLevel () > ActionLogLevel.Debug)
+                if (_logger.GetLogLevel () > ActionLogLevel.Trace && _logger.GetLogLevel () <= ActionLogLevel.Info)
                 {
-                    if (infoHead.Count < 3)
+                    if (infoHead.Count < _maxLogLines)
                     {
                         infoHead.Add (DateTime.UtcNow.ToString ("HH:mm:ss") + "\t" + strMessage);   
                     }
                     else
                     {
-                        if (infoTail.Count > 4)
+                        if (infoTail.Count > _maxLogLines)
                             infoTail.RemoveAt (0);
                         infoTail.Add (DateTime.UtcNow.ToString ("HH:mm:ss") + "\t" + strMessage);
                     }

@@ -23,19 +23,19 @@ namespace MongoDbActionsPlugin
             Description = "MongoDb Backup";
         }
 
-        public IEnumerable<PluginParameterDetails> GetParameterDetails ()
+        public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new PluginParameterDetails ("awsAccessKey", typeof (string), "AWS Access key for S3 usage");
-            yield return new PluginParameterDetails ("awsSecretAccessKey", typeof (string), "AWS Secret Access key for S3 usage");
-            yield return new PluginParameterDetails ("awsRedshiftPort", typeof (int), "AWS Redshift");
-            yield return new PluginParameterDetails ("awsRedshiftHost", typeof (string), "AWS Redshift");
-            yield return new PluginParameterDetails ("awsRedshiftDatabase", typeof (string), "AWS Redshift");
-            yield return new PluginParameterDetails ("awsRedshiftLogin", typeof (string), "AWS Redshift");
-            yield return new PluginParameterDetails ("awsRedshiftPassword", typeof (string), "AWS Redshift");
-            yield return new PluginParameterDetails ("inputSearchPath", typeof (string), "search path for the input files");
-            yield return new PluginParameterDetails ("backupLocation", typeof (string), "folder location to copy backup files");
-            yield return new PluginParameterDetails ("sqlScriptPath", typeof (string), "sql script path");
-            yield return new PluginParameterDetails ("errorLocation", typeof (string), "s3 errorLocation");
+            yield return new ModuleParameterDetails ("awsAccessKey", typeof (string), "AWS Access key for S3 usage");
+            yield return new ModuleParameterDetails ("awsSecretAccessKey", typeof (string), "AWS Secret Access key for S3 usage");
+            yield return new ModuleParameterDetails ("awsRedshiftPort", typeof (int), "AWS Redshift");
+            yield return new ModuleParameterDetails ("awsRedshiftHost", typeof (string), "AWS Redshift");
+            yield return new ModuleParameterDetails ("awsRedshiftDatabase", typeof (string), "AWS Redshift");
+            yield return new ModuleParameterDetails ("awsRedshiftLogin", typeof (string), "AWS Redshift");
+            yield return new ModuleParameterDetails ("awsRedshiftPassword", typeof (string), "AWS Redshift");
+            yield return new ModuleParameterDetails ("inputSearchPath", typeof (string), "search path for the input files");
+            yield return new ModuleParameterDetails ("backupLocation", typeof (string), "folder location to copy backup files");
+            yield return new ModuleParameterDetails ("sqlScriptPath", typeof (string), "sql script path");
+            yield return new ModuleParameterDetails ("errorLocation", typeof (string), "s3 errorLocation");
         }
 
         public string GetLastError ()
@@ -49,14 +49,9 @@ namespace MongoDbActionsPlugin
         }
 
         Record _options;
-        ActionLogger _logger;
+        IActionLogger _logger;
         AWSS3Helper _s3;
-
-        public void SetParameters (Record options, ActionLogger logger)
-        {
-            _options = options;
-            _logger = logger;
-        }
+       
 
         public bool Execute (params IEnumerable<Record>[] dataStreams)
         {

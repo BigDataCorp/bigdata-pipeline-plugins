@@ -18,12 +18,12 @@ namespace PipelineJobLoader
             return "Load jobs from a text file and updates the system jobs database";
         }
 
-        public IEnumerable<PluginParameterDetails> GetParameterDetails ()
+        public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new PluginParameterDetails ("JobLoader.SearchPath", typeof (string), "Input Search path with wildcards", true);
-            yield return new PluginParameterDetails ("JobLoader.BackupPath", typeof (string), "Path to the directory to where the loaded files will be copied to");
-            yield return new PluginParameterDetails ("JobLoader.awsAccessKey", typeof (string), "AWS Access key for S3 usage");
-            yield return new PluginParameterDetails ("JobLoader.awsSecretAccessKey", typeof (string), "AWS Secret Access key for S3 usage");
+            yield return new ModuleParameterDetails ("JobLoader.SearchPath", typeof (string), "Input Search path with wildcards", true);
+            yield return new ModuleParameterDetails ("JobLoader.BackupPath", typeof (string), "Path to the directory to where the loaded files will be copied to");
+            yield return new ModuleParameterDetails ("JobLoader.awsAccessKey", typeof (string), "AWS Access key for S3 usage");
+            yield return new ModuleParameterDetails ("JobLoader.awsSecretAccessKey", typeof (string), "AWS Secret Access key for S3 usage");
         }
 
         public PipelineJob GetJobRegistrationDetails ()
@@ -32,7 +32,7 @@ namespace PipelineJobLoader
             {
                 Id = this.GetType ().FullName,
                 Name = this.GetType ().Name,
-                Domain = "System",
+                Group = "System",
                 Enabled = true,
                 Scheduler = new List<string> { "*/30 * * * *" },
                 NextExecution = DateTime.UtcNow,

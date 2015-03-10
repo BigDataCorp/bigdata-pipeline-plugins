@@ -13,27 +13,27 @@ namespace FileListenerPlugin
         public string GetDescription ()
         {
             return "File Listener Get Module for detecting and downloading files";
-        }        
+        }
 
-        public IEnumerable<PluginParameterDetails> GetParameterDetails()
+        public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new PluginParameterDetails("awsAccessKey", typeof(string), "AWS Access key for S3 usage");
-            yield return new PluginParameterDetails("awsSecretAccessKey", typeof(string), "AWS Secret Access key for S3 usage");
+            yield return new ModuleParameterDetails("awsAccessKey", typeof(string), "AWS Access key for S3 usage");
+            yield return new ModuleParameterDetails("awsSecretAccessKey", typeof(string), "AWS Secret Access key for S3 usage");
             
-            yield return new PluginParameterDetails("searchPath", typeof(string), "search s3 path for files");
+            yield return new ModuleParameterDetails("searchPath", typeof(string), "search s3 path for files");
             
             
-            yield return new PluginParameterDetails("physicalDownloadPath", typeof(string), "physical path to download file");
-            yield return new PluginParameterDetails("backupLocation", typeof(string), "folder location to copy backup files");
-            yield return new PluginParameterDetails("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
-            yield return new PluginParameterDetails("errorLocation", typeof(string), "s3 errorLocation");
+            yield return new ModuleParameterDetails("physicalDownloadPath", typeof(string), "physical path to download file");
+            yield return new ModuleParameterDetails("backupLocation", typeof(string), "folder location to copy backup files");
+            yield return new ModuleParameterDetails("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
+            yield return new ModuleParameterDetails("errorLocation", typeof(string), "s3 errorLocation");
             
-            yield return new PluginParameterDetails ("sshKeyFiles", typeof (string), "List of ssh key files for sftp");
+            yield return new ModuleParameterDetails ("sshKeyFiles", typeof (string), "List of ssh key files for sftp");
 
-            yield return new PluginParameterDetails ("searchTopDirectoryOnly", typeof (bool), "Search for files on top directory or recursively");
+            yield return new ModuleParameterDetails ("searchTopDirectoryOnly", typeof (bool), "Search for files on top directory or recursively");
 
-            yield return new PluginParameterDetails ("retryCount", typeof (int), "");
-            yield return new PluginParameterDetails ("retryWaitMs", typeof (int), "");
+            yield return new ModuleParameterDetails ("retryCount", typeof (int), "");
+            yield return new ModuleParameterDetails ("retryWaitMs", typeof (int), "");
         }
         
         public bool Execute(ISessionContext context)

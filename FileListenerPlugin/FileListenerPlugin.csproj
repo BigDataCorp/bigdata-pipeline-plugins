@@ -72,7 +72,6 @@
     <Compile Include="FileTransfer\SFTPTransfer.cs" />
     <Compile Include="Move.cs" />
     <Compile Include="ReadLines.cs" />
-    <Compile Include="GetS3.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

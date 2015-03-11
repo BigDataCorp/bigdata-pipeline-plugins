@@ -26,6 +26,7 @@ namespace FileListenerPlugin
             yield return new ModuleParameterDetails ("errorLocation", typeof(string), "errorLocation");
 
             yield return new ModuleParameterDetails ("encoding", typeof (string), "default encoding. Defaults to ISO-8859-1");
+            yield return new ModuleParameterDetails ("maxFileCount", typeof (int), "maximum number of files to be processed in this pass");
             
             yield return new ModuleParameterDetails ("sshKeyFiles", typeof (string), "[SFTP] List of ssh key files for sftp");
             yield return new ModuleParameterDetails ("useReducedRedundancy", typeof (string), "[S3] reduced redundancy");
@@ -47,6 +48,7 @@ namespace FileListenerPlugin
             IFileTransfer output = null;
             string lastFile = null;
             int filesCount = 0;
+            int maxFilesCount = Int32.MaxValue;
             FileTransferDetails parsedErrorLocation = null;
 
             try
@@ -60,7 +62,11 @@ namespace FileListenerPlugin
                     throw new ArgumentNullException ("destinationPath");
 
                 var deleteSourceFile = _options.Get<bool>("deleteSourceFile", false);
-                
+
+                maxFilesCount = _options.Get ("searchPath", maxFilesCount);
+                if (maxFilesCount <= 0)
+                    maxFilesCount = Int32.MaxValue;
+
                 // prepare paths
                 var parsedInput = FileTransferDetails.ParseSearchPath (searchPath, _options);
                 if (!String.IsNullOrEmpty (parsedInput.FilePath))
@@ -111,6 +117,10 @@ namespace FileListenerPlugin
                     {
                         input.RemoveFile (f.FileName);
                     }
+
+                    // limit
+                    if (filesCount >= maxFilesCount)
+                        break;
                 }
 
                 if (filesCount > 0)

@@ -10,6 +10,27 @@ namespace FileListenerPlugin
         public Stream FileStream { get; set; }
     }
 
+    public class FileTransferInfo
+    {
+        public string FileName { get; set; }
+        public long Size { get; set; }
+        public DateTime Created { get; set; }
+        public DateTime Modified { get; set; }
+        public FileTransferInfo (string fileName, long size)
+        {
+            FileName = fileName;
+            Size = size;
+        }
+
+        public FileTransferInfo (string fileName, long size, DateTime created, DateTime modified)
+        {
+            FileName = fileName;
+            Size = size;
+            Created = created;
+            Modified = modified;
+        }
+    }
+
     public class FileTransferDetails : BigDataPipeline.FlexibleObject
     {
         public const int DefaultReadBufferSize = 2 * 1024 * 1024;
@@ -58,6 +79,34 @@ namespace FileListenerPlugin
             SearchTopDirectoryOnly = true;
         }
 
+        public IFileTransfer OpenConnection ()
+        {
+            IFileTransfer conn;
+            switch (Location)
+            {
+                case FileLocation.S3:
+                    conn = new S3Transfer ();
+                    break;
+                case FileLocation.HTTP:
+                    conn = new HttpTransfer ();
+                    break;
+                case FileLocation.FTP:
+                case FileLocation.FTPS:
+                case FileLocation.FTPES:
+                    conn = new FTPTransfer ();
+                    break;
+                case FileLocation.SFTP:
+                    conn = new SFTPTransfer ();
+                    break;
+                case FileLocation.FileSystem:
+                default:
+                    conn = new FileSystemTransfer ();
+                    break;
+            }
+            conn.Open (this);
+            return conn;
+        }
+
         /// <summary>
         /// 
         /// ftp://[login:password@][server][:port]/[path]/[file name or wildcard expression]
@@ -71,7 +120,7 @@ namespace FileListenerPlugin
         /// c:/[path]/[file name or wildcard expression]
         /// 
         /// </summary>
-        public static FileTransferDetails ParseSearchPath (string inputSearchPath)
+        public static FileTransferDetails ParseSearchPath (string inputSearchPath, BigDataPipeline.FlexibleObject extraOptions = null)
         {
             FileTransferDetails obj = new FileTransferDetails ();
             // sanity check
@@ -112,6 +161,21 @@ namespace FileListenerPlugin
             }
 
             ParsePath (obj, inputSearchPath);
+
+            // parse extra options
+            // set custom options like: sshKeyFiles (SFTP), useReducedRedundancy (S3), makePublic (S3), partSize (S3)
+            if (extraOptions != null)
+            {
+                obj.SearchTopDirectoryOnly = extraOptions.Get ("searchTopDirectoryOnly", obj.SearchTopDirectoryOnly);
+                obj.RetryCount = extraOptions.Get ("retryCount", obj.RetryCount);
+                obj.RetryWaitMs = extraOptions.Get ("retryWaitMs", obj.RetryWaitMs);
+                foreach (var o in extraOptions.Options)
+                {
+                    if (String.IsNullOrWhiteSpace (o.Value))
+                        continue;
+                    obj.Set (o.Key, o.Value);
+                }
+            }
 
             return obj;
         }

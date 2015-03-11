@@ -56,6 +56,13 @@ namespace FileListenerPlugin
                 return false;
             }
 
+            // check for empty login/password
+            if (String.IsNullOrEmpty (Details.Login) && String.IsNullOrEmpty (Details.Password))
+            {
+                Details.Login = Details.Get ("awsAccessKey", Details.Login);
+                Details.Password = Details.Get ("awsSecretAccessKey", Details.Password);
+            }
+
             var s3Region = Amazon.RegionEndpoint.GetBySystemName (Details.Get ("awsRegion", "us-east-1"));
             if (s3Region.DisplayName == "Unknown")
             {
@@ -122,7 +129,7 @@ namespace FileListenerPlugin
             client = null;
         }
 
-        private IEnumerable<string> _listFiles (string folder, System.Text.RegularExpressions.Regex pattern, bool recursive)
+        private IEnumerable<FileTransferInfo> _listFiles (string folder, System.Text.RegularExpressions.Regex pattern, bool recursive)
         {
             _setStatus (true);
 
@@ -131,25 +138,36 @@ namespace FileListenerPlugin
 
             folder = PreparePath (folder);
 
-            foreach (var f in client.GetFileList (folder, recursive, false))
-                if (!f.EndsWith ("/") && (pattern == null || pattern.IsMatch (System.IO.Path.GetFileName (f))))
-                    yield return f;
+            foreach (var f in client.ListFiles (folder, recursive, false, true))
+                if ((pattern == null || pattern.IsMatch (System.IO.Path.GetFileName (f.Key))))
+                    yield return new FileTransferInfo (f.Key, f.Size, f.LastModified, f.LastModified);
         }
-        
-        public IEnumerable<string> ListFiles ()
+
+        public IEnumerable<FileTransferInfo> ListFiles ()
         {
             return ListFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
-        public IEnumerable<string> ListFiles (string folder, bool recursive)
+        public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
         { 
             return _listFiles (folder, null, recursive);
         }
 
-        public IEnumerable<string> ListFiles (string folder, string fileMask, bool recursive)
+        public IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive)
         {
             var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferDetails.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
             return _listFiles (folder, pattern, recursive);
+        }
+
+        public StreamTransfer GetFileStream (string file)
+        {
+            _setStatus (true);
+            // download files
+            return new StreamTransfer
+            {
+                FileName = file,
+                FileStream = client.ReadFile (file, true)
+            };
         }
 
         public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
@@ -162,8 +180,8 @@ namespace FileListenerPlugin
             {
                 yield return new StreamTransfer
                 {
-                    FileName = f,
-                    FileStream = client.ReadFile (f, false)
+                    FileName = f.FileName,
+                    FileStream = client.ReadFile (f.FileName, false)
                 };
             }
         }
@@ -173,7 +191,56 @@ namespace FileListenerPlugin
             return GetFileStreams (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
-        public IEnumerable<string> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
+        public FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess)
+        {
+            outputDirectory = outputDirectory.Replace ('\\', '/');
+            if (!outputDirectory.EndsWith ("/"))
+                outputDirectory += "/";
+            FileTransferDetails.CreateDirectory (outputDirectory);
+
+            // download files
+            var f = GetFileStream (file);
+
+            string newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
+            FileTransferDetails.DeleteFile (newFile);
+
+            try
+            {
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                {
+                    f.FileStream.CopyTo (output, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                }
+
+                // check if we must remove file
+                if (deleteOnSuccess)
+                {
+                    FileTransferDetails.DeleteFile (f.FileName);
+                }
+
+                _setStatus (true);
+            }
+            catch (Exception ex)
+            {
+                _setStatus (ex);
+                FileTransferDetails.DeleteFile (newFile);
+                newFile = null;
+            }
+            finally
+            {
+                f.FileStream.Close ();
+            }
+
+            // check if file was downloaded
+            if (newFile != null)
+            {
+                var info = new System.IO.FileInfo (newFile);
+                if (info.Exists)
+                    return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
+            }
+            return null;
+        }
+
+        public IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
         {
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
@@ -226,20 +293,23 @@ namespace FileListenerPlugin
                 }
 
                 // check if file was downloaded
-                if (newFile != null && System.IO.File.Exists (newFile))
+                if (newFile != null)
                 {
-                    yield return newFile;
+                    var info = new System.IO.FileInfo (newFile);
+                    if (info.Exists)
+                        yield return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
                 }
             }
         }
 
-        public IEnumerable<string> GetFiles (string outputDirectory, bool deleteOnSuccess)
+        public IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess)
         {
             return GetFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
         }
 
         public bool RemoveFiles (IEnumerable<string> files)
         {
+            _setStatus (false);
             var enumerator = files.GetEnumerator ();            
             string file = null;
             for (int i = 0; i < Details.RetryCount; i++)
@@ -277,6 +347,33 @@ namespace FileListenerPlugin
             return Status == FileTranferStatus.Success;
         }
 
+        public bool RemoveFile (string file)
+        {
+            _setStatus (false);
+            for (int i = 0; i < Details.RetryCount; i++)
+            {
+                // try to open
+                if (!Open ())
+                    continue;
+
+                try
+                {
+                    file = PreparePath (file);
+                    client.DeleteFile (file, true);
+                    _setStatus (true);
+                }
+                catch (Exception ex)
+                {
+                    _setStatus (ex);
+                    // disconnect on error
+                    Close ();
+                    // delay in case of network error
+                    System.Threading.Thread.Sleep (Details.RetryWaitMs);
+                }
+            }
+            return Status == FileTranferStatus.Success;
+        }
+
         public bool SendFile (string localFilename)
         {
             return SendFile (localFilename, System.IO.Path.Combine (Details.FilePath, System.IO.Path.GetFileName (localFilename)));
@@ -301,7 +398,7 @@ namespace FileListenerPlugin
                 try
                 {
                     // upload
-                    using (Stream ostream = new S3UploadStream (client, destFullPath, Details.Get ("UseReducedRedundancy", false), true, Details.Get ("MakePublic", false), Details.Get ("PartSize", 10 * 1024 * 1024)))
+                    using (Stream ostream = new S3UploadStream (client, destFullPath, Details.Get ("useReducedRedundancy", false), true, Details.Get ("makePublic", false), Details.Get ("partSize", 20 * 1024 * 1024)))
                     {
                         using (var file = localFile)
                         {

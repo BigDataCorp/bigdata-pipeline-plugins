@@ -39,7 +39,7 @@
     </Reference>
     <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\BigDataPipeline.Interface.1.7.2\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.7.3\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="Dapper, Version=1.38.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>

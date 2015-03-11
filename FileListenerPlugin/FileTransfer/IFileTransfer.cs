@@ -35,21 +35,27 @@ namespace FileListenerPlugin
 
         void Dispose ();
 
-        IEnumerable<string> ListFiles ();
+        IEnumerable<FileTransferInfo> ListFiles ();
 
-        IEnumerable<string> ListFiles (string folder, bool recursive);
+        IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive);
 
-        IEnumerable<string> ListFiles (string folder, string fileMask, bool recursive);
+        IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive);
+
+        StreamTransfer GetFileStream (string file);
 
         IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive);
 
         IEnumerable<StreamTransfer> GetFileStreams ();
 
-        IEnumerable<string> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess);
+        FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess);
 
-        IEnumerable<string> GetFiles (string outputDirectory, bool deleteOnSuccess);
+        IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess);
+
+        IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess);
 
         bool RemoveFiles (IEnumerable<string> files);
+
+        bool RemoveFile (string file);
 
         bool SendFile (string localFilename);
 

@@ -67,7 +67,7 @@ namespace FileListenerPlugin
         {            
         }
 
-        private IEnumerable<string> _listFiles (string folder, string pattern, bool recursive)
+        private IEnumerable<FileTransferInfo> _listFiles (string folder, string pattern, bool recursive)
         {
             _setStatus (true);
 
@@ -76,22 +76,34 @@ namespace FileListenerPlugin
             if (String.IsNullOrEmpty (pattern))
                 pattern = "*";
 
-            return System.IO.Directory.EnumerateFiles (folder, pattern, recursive ? System.IO.SearchOption.AllDirectories : System.IO.SearchOption.TopDirectoryOnly);
+            return System.IO.Directory.EnumerateFiles (folder, pattern, recursive ? System.IO.SearchOption.AllDirectories : System.IO.SearchOption.TopDirectoryOnly)
+                       .Select (i => new FileInfo (i)).Select (i => new FileTransferInfo (i.FullName, i.Length, i.CreationTime, i.LastWriteTime));
         }
 
-        public IEnumerable<string> ListFiles ()
+        public IEnumerable<FileTransferInfo> ListFiles ()
         {
             return ListFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
-        public IEnumerable<string> ListFiles (string folder, bool recursive)
+        public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
         {
             return _listFiles (folder, null, recursive);
         }
 
-        public IEnumerable<string> ListFiles (string folder, string fileMask, bool recursive)
+        public IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive)
         {
             return _listFiles (folder, fileMask, recursive);
+        }
+
+        public StreamTransfer GetFileStream (string file)
+        {
+            _setStatus (true);
+            // download files
+            return new StreamTransfer
+            {
+                FileName = file,
+                FileStream = new FileStream (file, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultReadBufferSize)
+            };
         }
 
         public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
@@ -102,8 +114,8 @@ namespace FileListenerPlugin
             {
                 yield return new StreamTransfer
                 {
-                    FileName = f,
-                    FileStream = new FileStream (f, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultReadBufferSize)
+                    FileName = f.FileName,
+                    FileStream = new FileStream (f.FileName, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultReadBufferSize)
                 };
             }
         }
@@ -113,7 +125,56 @@ namespace FileListenerPlugin
             return GetFileStreams (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
-        public IEnumerable<string> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
+        public FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess)
+        {
+            outputDirectory = outputDirectory.Replace ('\\', '/');
+            if (!outputDirectory.EndsWith ("/"))
+                outputDirectory += "/";
+            FileTransferDetails.CreateDirectory (outputDirectory);
+
+            // download files
+            var f = GetFileStream (file);            
+            
+            string newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
+            FileTransferDetails.DeleteFile (newFile);
+
+            try
+            {
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                {
+                    f.FileStream.CopyTo (output, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                }
+
+                // check if we must remove file
+                if (deleteOnSuccess)
+                {
+                    FileTransferDetails.DeleteFile (f.FileName);
+                }
+
+                _setStatus (true);
+            }
+            catch (Exception ex)
+            {
+                _setStatus (ex);
+                FileTransferDetails.DeleteFile (newFile);
+                newFile = null;
+            }
+            finally
+            {
+                f.FileStream.Close ();
+            }
+
+            // check if file was downloaded
+            if (newFile != null)
+            {
+                var info = new System.IO.FileInfo (newFile);
+                if (info.Exists)
+                    return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
+            }
+            return null;
+        }
+
+        public IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
         {
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
@@ -153,14 +214,16 @@ namespace FileListenerPlugin
                 }
 
                 // check if file was downloaded
-                if (newFile != null && System.IO.File.Exists (newFile))
+                if (newFile != null)
                 {
-                    yield return newFile;
-                }
+                    var info = new System.IO.FileInfo (newFile);
+                    if (info.Exists)
+                        yield return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
+                }                
             }
         }
 
-        public IEnumerable<string> GetFiles (string outputDirectory, bool deleteOnSuccess)
+        public IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess)
         {
             return GetFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
         }
@@ -172,6 +235,13 @@ namespace FileListenerPlugin
 
             _setStatus (true);
 
+            return Status == FileTranferStatus.Success;
+        }
+
+        public bool RemoveFile (string file)
+        {
+            FileTransferDetails.DeleteFile (file);
+            _setStatus (true);
             return Status == FileTranferStatus.Success;
         }
 

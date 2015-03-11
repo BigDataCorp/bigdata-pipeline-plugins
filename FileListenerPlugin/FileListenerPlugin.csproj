@@ -36,7 +36,7 @@
     </Reference>
     <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\BigDataPipeline.Interface.1.7.2\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.7.3\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="NCrontab, Version=2.0.16709.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -70,7 +70,9 @@
     <Compile Include="FileTransfer\IFileTransfer.cs" />
     <Compile Include="FileTransfer\FTPTransfer.cs" />
     <Compile Include="FileTransfer\SFTPTransfer.cs" />
-    <Compile Include="Get.cs" />
+    <Compile Include="Move.cs" />
+    <Compile Include="ReadLines.cs" />
+    <Compile Include="GetS3.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

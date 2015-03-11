@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace FileListenerPlugin
 {
-    public class Get : IActionModule
+    public class GetS3 : IActionModule
     {
         public string GetDescription ()
         {
@@ -17,16 +17,15 @@ namespace FileListenerPlugin
 
         public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new ModuleParameterDetails("awsAccessKey", typeof(string), "AWS Access key for S3 usage");
-            yield return new ModuleParameterDetails("awsSecretAccessKey", typeof(string), "AWS Secret Access key for S3 usage");
+            yield return new ModuleParameterDetails ("awsAccessKey", typeof(string), "AWS Access key for S3 usage");
+            yield return new ModuleParameterDetails ("awsSecretAccessKey", typeof(string), "AWS Secret Access key for S3 usage");
             
-            yield return new ModuleParameterDetails("searchPath", typeof(string), "search s3 path for files");
+            yield return new ModuleParameterDetails ("searchPath", typeof(string), "search s3 path for files");
             
-            
-            yield return new ModuleParameterDetails("physicalDownloadPath", typeof(string), "physical path to download file");
-            yield return new ModuleParameterDetails("backupLocation", typeof(string), "folder location to copy backup files");
-            yield return new ModuleParameterDetails("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
-            yield return new ModuleParameterDetails("errorLocation", typeof(string), "s3 errorLocation");
+            yield return new ModuleParameterDetails ("physicalDownloadPath", typeof(string), "physical path to download file");
+            yield return new ModuleParameterDetails ("backupLocation", typeof(string), "folder location to copy backup files");
+            yield return new ModuleParameterDetails ("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
+            yield return new ModuleParameterDetails ("errorLocation", typeof(string), "s3 errorLocation");
             
             yield return new ModuleParameterDetails ("sshKeyFiles", typeof (string), "List of ssh key files for sftp");
 

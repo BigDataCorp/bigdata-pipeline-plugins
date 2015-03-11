@@ -55,6 +55,13 @@ namespace FileListenerPlugin
             if (Details.Port <= 0)
                 Details.Port = Details.Location == FileLocation.FTPS ? 990 : 21;
 
+            // check for empty login/password
+            if (String.IsNullOrEmpty (Details.Login) && String.IsNullOrEmpty (Details.Password))
+            {
+                Details.Login = Details.Get ("ftpLogin", Details.Login);
+                Details.Password = Details.Get ("ftpPassword", Details.Password);
+            }
+
             // Default, use the EPSV command for data channels. Other
             // options are Passive (PASV), ExtenedActive (EPRT) and
             // Active (PORT). EPSV should work for most people against
@@ -201,21 +208,32 @@ namespace FileListenerPlugin
                     if (pattern == null || pattern.IsMatch (System.IO.Path.GetFileName (f.FullName)))
                         yield return f;
         }
-        
-        public IEnumerable<string> ListFiles ()
+
+        public IEnumerable<FileTransferInfo> ListFiles ()
         {
             return ListFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
-        public IEnumerable<string> ListFiles (string folder, bool recursive)
+        public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
         { 
-            return _listFiles (folder, null, recursive).Select (i => i.FullName);
+            return _listFiles (folder, null, recursive).Select (i => new FileTransferInfo (i.FullName, i.Size, i.Created, i.Modified));
         }
 
-        public IEnumerable<string> ListFiles (string folder, string fileMask, bool recursive)
+        public IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive)
         {
             var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferDetails.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            return _listFiles (folder, pattern, recursive).Select (i => i.FullName);
+            return _listFiles (folder, pattern, recursive).Select (i => new FileTransferInfo (i.FullName, i.Size, i.Created, i.Modified));
+        }
+
+        public StreamTransfer GetFileStream (string file)
+        {
+            _setStatus (true);
+            // download files
+            return new StreamTransfer
+            {
+                FileName = file,
+                FileStream = client.OpenRead (file)
+            };
         }
 
         public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
@@ -267,7 +285,56 @@ namespace FileListenerPlugin
             return GetFileStreams (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
-        public IEnumerable<string> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
+        public FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess)
+        {
+            outputDirectory = outputDirectory.Replace ('\\', '/');
+            if (!outputDirectory.EndsWith ("/"))
+                outputDirectory += "/";
+            FileTransferDetails.CreateDirectory (outputDirectory);
+
+            // download files
+            var f = GetFileStream (file);
+
+            string newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
+            FileTransferDetails.DeleteFile (newFile);
+
+            try
+            {
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                {
+                    f.FileStream.CopyTo (output, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                }
+
+                // check if we must remove file
+                if (deleteOnSuccess)
+                {
+                    FileTransferDetails.DeleteFile (f.FileName);
+                }
+
+                _setStatus (true);
+            }
+            catch (Exception ex)
+            {
+                _setStatus (ex);
+                FileTransferDetails.DeleteFile (newFile);
+                newFile = null;
+            }
+            finally
+            {
+                f.FileStream.Close ();
+            }
+
+            // check if file was downloaded
+            if (newFile != null)
+            {
+                var info = new System.IO.FileInfo (newFile);
+                if (info.Exists)
+                    return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
+            }
+            return null;
+        }
+
+        public IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
         {
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
@@ -320,14 +387,16 @@ namespace FileListenerPlugin
                 }
 
                 // check if file was downloaded
-                if (newFile != null && System.IO.File.Exists (newFile))
+                if (newFile != null)
                 {
-                    yield return newFile;
+                    var info = new System.IO.FileInfo (newFile);
+                    if (info.Exists)
+                        yield return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
                 }
             }
         }
 
-        public IEnumerable<string> GetFiles (string outputDirectory, bool deleteOnSuccess)
+        public IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess)
         {
             return GetFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
         }
@@ -368,6 +437,33 @@ namespace FileListenerPlugin
                 }
             }
 
+            return Status == FileTranferStatus.Success;
+        }
+
+        public bool RemoveFile (string file)
+        {
+            _setStatus (false);
+            for (int i = 0; i < Details.RetryCount; i++)
+            {
+                // try to open
+                if (!Open ())
+                    continue;
+
+                try
+                {
+                    file = PreparePath (file);
+                    client.DeleteFile (file);
+                    _setStatus (true);
+                }
+                catch (Exception ex)
+                {
+                    _setStatus (ex);
+                    // disconnect on error
+                    Close ();
+                    // delay in case of network error
+                    System.Threading.Thread.Sleep (Details.RetryWaitMs);
+                }
+            }
             return Status == FileTranferStatus.Success;
         }
 

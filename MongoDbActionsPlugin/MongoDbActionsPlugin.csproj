@@ -61,7 +61,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AWS\AWSS3Helper.cs" />
-    <Compile Include="MongoDbBackup.cs" />
+    <Compile Include="MongoInsert.cs" />
+    <Compile Include="MongoInsert2.cs" />
     <Compile Include="MongoDb\MongoDbContext.cs" />
     <Compile Include="MongoDb\MongoObjectIdJsonConverter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -70,6 +71,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>xcopy /E /Y /Q /r "$(TargetDir)*.dll" "$(SolutionDir)Publish\$(TargetName)\"</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

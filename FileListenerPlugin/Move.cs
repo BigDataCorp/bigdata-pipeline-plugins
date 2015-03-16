@@ -49,7 +49,7 @@ namespace FileListenerPlugin
             string lastFile = null;
             int filesCount = 0;
             int maxFilesCount = Int32.MaxValue;
-            FileTransferDetails parsedErrorLocation = null;
+            FileTransferService parsedErrorLocation = new FileTransferService();
 
             try
             {
@@ -63,22 +63,22 @@ namespace FileListenerPlugin
 
                 var deleteSourceFile = _options.Get<bool>("deleteSourceFile", false);
 
-                maxFilesCount = _options.Get ("searchPath", maxFilesCount);
+                maxFilesCount = _options.Get ("maxFileCount", maxFilesCount);
                 if (maxFilesCount <= 0)
                     maxFilesCount = Int32.MaxValue;
+                
+                var defaultEncoding = Encoding.GetEncoding (_options.Get ("encoding", "ISO-8859-1"));
 
                 // prepare paths
-                var parsedInput = FileTransferDetails.ParseSearchPath (searchPath, _options);
-                if (!String.IsNullOrEmpty (parsedInput.FilePath))
+                var parsedInput = FileTransferService.Create (searchPath, _options);
+                if (!parsedInput.HasConnectionString)
                     throw new Exception ("Invalid searchPath: " + searchPath);
-                var parsedOutput = FileTransferDetails.ParseSearchPath (destinationPath, _options);
-                if (!String.IsNullOrEmpty (parsedOutput.FilePath))
+                var parsedOutput = FileTransferService.Create (destinationPath, _options);
+                if (!parsedOutput.HasConnectionString)
                     throw new Exception ("Invalid destinationPath: " + destinationPath);
 
-                var parsedBackupLocation = FileTransferDetails.ParseSearchPath (_options.Get ("backupLocation", ""), _options);
-                parsedErrorLocation = FileTransferDetails.ParseSearchPath (_options.Get ("errorLocation", ""), _options);
-
-                var defaultEncoding = Encoding.GetEncoding (_options.Get ("encoding", "ISO-8859-1"));
+                var parsedBackupLocation = FileTransferService.Create (_options.Get ("backupLocation", ""), _options);
+                parsedErrorLocation.Parse (_options.Get ("errorLocation", ""), _options);                
 
                 // open connection
                 Layout layout = new Layout ();
@@ -92,8 +92,8 @@ namespace FileListenerPlugin
                     _logger.Info ("File found: " + lastFile);
                     filesCount++;
 
-                    // upload file
-                    var fileName = System.IO.Path.Combine (parsedOutput.FilePath, System.IO.Path.GetFileName (f.FileName));
+                    // upload file                    
+                    var fileName = parsedOutput.GetDestinationPath (f.FileName);
                     output.SendFile (f.FileStream, fileName, true);
 
                     context.Emit (layout.Create ()
@@ -104,12 +104,12 @@ namespace FileListenerPlugin
                                       .Set ("SourceFileName", f.FileName));
                     
                     // If backup folder exists, move file
-                    if (!String.IsNullOrEmpty (parsedBackupLocation.FilePath))
+                    if (parsedBackupLocation.HasConnectionString)
                     {
                         // TODO: implement move operation if location are the same!
-                        var destName = System.IO.Path.Combine (parsedBackupLocation.FilePath, System.IO.Path.GetFileName (f.FileName));
+                        var destName = parsedBackupLocation.GetDestinationPath (f.FileName);
                         using (var backup = parsedBackupLocation.OpenConnection ()) 
-                            backup.SendFile (input.GetFileStream (f.FileName).FileStream, parsedBackupLocation.FilePath, true);
+                            backup.SendFile (input.GetFileStream (f.FileName).FileStream, destName, true);
                     }
 
                     // If DeleSource is set
@@ -140,11 +140,11 @@ namespace FileListenerPlugin
                 _logger.Error (ex);
                 try
                 {
-                    if (lastFile != null && input != null && parsedErrorLocation != null && !String.IsNullOrEmpty (parsedErrorLocation.FilePath))
+                    if (lastFile != null && input != null && parsedErrorLocation.HasConnectionString)
                     { // move files
-                        var destName = System.IO.Path.Combine (parsedErrorLocation.FilePath, System.IO.Path.GetFileName (lastFile));
+                        var destName = parsedErrorLocation.GetDestinationPath (lastFile);
                         using (var backup = parsedErrorLocation.OpenConnection ())
-                            backup.SendFile (input.GetFileStream (lastFile).FileStream, parsedErrorLocation.FilePath, true);
+                            backup.SendFile (input.GetFileStream (lastFile).FileStream, destName, true);
                     }
                 }
                 catch { }

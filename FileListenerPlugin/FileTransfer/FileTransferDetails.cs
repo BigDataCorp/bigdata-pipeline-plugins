@@ -31,7 +31,7 @@ namespace FileListenerPlugin
         }
     }
 
-    public class FileTransferDetails : BigDataPipeline.FlexibleObject
+    public class FileTransferConnectionInfo : BigDataPipeline.FlexibleObject
     {
         public const int DefaultReadBufferSize = 2 * 1024 * 1024;
         public const int DefaultWriteBufferSize = 512 * 1024;
@@ -72,17 +72,45 @@ namespace FileListenerPlugin
 
         public bool SearchTopDirectoryOnly { get; set; }
 
-        public FileTransferDetails ()
+        public FileTransferConnectionInfo ()
         {
             RetryCount = 3;
             RetryWaitMs = 500;
             SearchTopDirectoryOnly = true;
         }
+    }
 
+    public class FileTransferService
+    {
+        FileTransferConnectionInfo ConnectionInfo { get; set; }
+
+        public FileTransferService () {}
+
+        public FileTransferService (FileTransferConnectionInfo connectionInfo)
+        {
+            ConnectionInfo = connectionInfo;
+        }
+
+        public bool HasConnectionString
+        {
+            get { return ConnectionInfo != null && !String.IsNullOrEmpty (ConnectionInfo.FilePath); }
+        }
+
+        public static FileTransferService Create (string connectionString, BigDataPipeline.FlexibleObject extraOptions = null)
+        {
+           return new FileTransferService (FileTransferService.ParseConnectionString (connectionString, extraOptions));
+        }
+
+        public bool Parse (string connectionString, BigDataPipeline.FlexibleObject extraOptions = null)
+        {
+            ConnectionInfo = FileTransferService.ParseConnectionString (connectionString, extraOptions);
+            return HasConnectionString;
+        }
+        
         public IFileTransfer OpenConnection ()
         {
             IFileTransfer conn;
-            switch (Location)
+            switch (ConnectionInfo.Location)
             {
                 case FileLocation.S3:
                     conn = new S3Transfer ();
@@ -103,7 +131,7 @@ namespace FileListenerPlugin
                     conn = new FileSystemTransfer ();
                     break;
             }
-            conn.Open (this);
+            conn.Open (ConnectionInfo);
             return conn;
         }
 
@@ -120,18 +148,18 @@ namespace FileListenerPlugin
         /// c:/[path]/[file name or wildcard expression]
         /// 
         /// </summary>
-        public static FileTransferDetails ParseSearchPath (string inputSearchPath, BigDataPipeline.FlexibleObject extraOptions = null)
+        public static FileTransferConnectionInfo ParseConnectionString (string connectionString, BigDataPipeline.FlexibleObject extraOptions = null)
         {
-            FileTransferDetails obj = new FileTransferDetails ();
+            FileTransferConnectionInfo obj = new FileTransferConnectionInfo ();
             // sanity check
-            if (string.IsNullOrWhiteSpace (inputSearchPath))
+            if (string.IsNullOrWhiteSpace (connectionString))
                 return obj;
 
-            inputSearchPath = inputSearchPath.Trim ().Replace ("\\", "/");
-            obj.ConnectionString = inputSearchPath;
+            connectionString = connectionString.Trim ().Replace ("\\", "/");
+            obj.ConnectionString = connectionString;
 
             // s3://BucketName/directory_like_path/*.txt
-            var path = SplitPrefix (inputSearchPath);
+            var path = SplitPrefix (connectionString);
             
             switch (path[0])
             {
@@ -141,7 +169,7 @@ namespace FileListenerPlugin
                 case "http":
                 case "https":
                     obj.Location = FileLocation.HTTP;
-                    obj.FilePath = inputSearchPath;
+                    obj.FilePath = connectionString;
                     break;
                 case "ftp":
                     obj.Location = FileLocation.FTP;
@@ -160,7 +188,7 @@ namespace FileListenerPlugin
                     break;
             }
 
-            ParsePath (obj, inputSearchPath);
+            ParsePath (obj, connectionString);
 
             // parse extra options
             // set custom options like: sshKeyFiles (SFTP), useReducedRedundancy (S3), makePublic (S3), partSize (S3)
@@ -204,7 +232,7 @@ namespace FileListenerPlugin
             return path;
         }
 
-        private static void ParsePath (FileTransferDetails obj, string inputSearchPath)
+        private static void ParsePath (FileTransferConnectionInfo obj, string connectionString)
         {
             try
             {
@@ -212,18 +240,18 @@ namespace FileListenerPlugin
                 if (obj.Location == FileLocation.HTTP)
                 {
                     obj.UseWildCardSearch = false;
-                    obj.FilePath = inputSearchPath;
+                    obj.FilePath = connectionString;
                     return;
                 }
                 else if (obj.Location == FileLocation.FileSystem)
                 {
                     obj.UseWildCardSearch = false;
-                    obj.FilePath = System.IO.Path.GetDirectoryName (inputSearchPath).Replace ('\\', '/');
-                    obj.SearchPattern = System.IO.Path.GetFileName (inputSearchPath);
+                    obj.FilePath = System.IO.Path.GetDirectoryName (connectionString).Replace ('\\', '/');
+                    obj.SearchPattern = System.IO.Path.GetFileName (connectionString);
                     return;
                 }
 
-                var splitedPath = SplitPrefix (inputSearchPath);
+                var splitedPath = SplitPrefix (connectionString);
                 var path = splitedPath[1];
             
                 // extract login and password
@@ -295,12 +323,12 @@ namespace FileListenerPlugin
                         {
                             int endPos = (wildCard1 > 0 && wildCard2 > 0) ? Math.Min (wildCard1, wildCard2) : Math.Max (wildCard1, wildCard2);
                             obj.FilePath = path.Substring (0, endPos);
-                            obj.SearchPattern = WildcardToRegex (path);                    
+                            obj.SearchPattern = FileTransferHelpers.WildcardToRegex (path);                    
                         }
                         else
                         {
                             obj.FilePath = System.IO.Path.GetDirectoryName (path).Replace ('\\', '/');
-                            obj.SearchPattern = WildcardToRegex (path);
+                            obj.SearchPattern = FileTransferHelpers.WildcardToRegex (path);
                         }
                     }
                     else if (obj.Location == FileLocation.S3)
@@ -328,31 +356,39 @@ namespace FileListenerPlugin
                     obj.FilePath = obj.FilePath + '/';
             }
         }
+        
+        public string GetDestinationPath (string filename)
+        {
+            return System.IO.Path.Combine (ConnectionInfo.FilePath, System.IO.Path.GetFileName (filename)).Replace ('\\', '/');
+        }
+    }
 
+
+    public class FileTransferHelpers
+    {
         public static string WildcardToRegex (string pattern)
         {
-            // (new System.Text.RegularExpressions.Regex (pattern,RegexOptions.IgnoreCase)).IsMatch (txt)
-
             return "^" + System.Text.RegularExpressions.Regex.Escape (pattern).
                                Replace (@"\*", ".*").
                                Replace (@"\?", ".") + "$";
         }
 
-        public static void DeleteFile(string fileName)
+
+        public static void DeleteFile (string fileName)
         {
-            if (fileName == null)
+            if (String.IsNullOrEmpty (fileName))
                 return;
             try { System.IO.File.Delete (fileName); }
             catch { }
         }
 
-        public static void CreateDirectory (string path)
+        public static void CreateDirectory (string folder)
         {
-            if (path == null)
+            if (String.IsNullOrEmpty (folder))
                 return;
-            try { System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName (path)); }
+            folder = folder.Replace ('\\', '/');
+            try { System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName (folder)); }
             catch { }
         }
-
     }
 }

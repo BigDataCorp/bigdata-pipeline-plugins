@@ -10,7 +10,7 @@ namespace FileListenerPlugin
     {
         SftpClient client;        
 
-        public FileTransferDetails Details { get; private set; }
+        public FileTransferConnectionInfo Details { get; private set; }
 
         public FileTranferStatus Status { get; private set; }
 
@@ -35,7 +35,7 @@ namespace FileListenerPlugin
             LastError = message;
         }
                 
-        public bool Open (FileTransferDetails details)
+        public bool Open (FileTransferConnectionInfo details)
         { 
             Details = details;
             if (Details.RetryCount <= 0)
@@ -196,7 +196,7 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive)
         {
-            var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferDetails.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferHelpers.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
             return _listFiles (folder, pattern, recursive).Select (i => new FileTransferInfo (i.FullName, i.Length, i.LastWriteTime, i.LastWriteTime));
         }
 
@@ -213,7 +213,7 @@ namespace FileListenerPlugin
 
         public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
         {
-            var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferDetails.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferHelpers.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
             // get files
             List<Renci.SshNet.Sftp.SftpFile> files = null;
@@ -265,25 +265,25 @@ namespace FileListenerPlugin
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
                 outputDirectory += "/";
-            FileTransferDetails.CreateDirectory (outputDirectory);
+            FileTransferHelpers.CreateDirectory (outputDirectory);
 
             // download files
             var f = GetFileStream (file);
 
             string newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
-            FileTransferDetails.DeleteFile (newFile);
+            FileTransferHelpers.DeleteFile (newFile);
 
             try
             {
-                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
                 {
-                    f.FileStream.CopyTo (output, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                    f.FileStream.CopyTo (output, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
                 }
 
                 // check if we must remove file
                 if (deleteOnSuccess)
                 {
-                    FileTransferDetails.DeleteFile (f.FileName);
+                    FileTransferHelpers.DeleteFile (f.FileName);
                 }
 
                 _setStatus (true);
@@ -291,7 +291,7 @@ namespace FileListenerPlugin
             catch (Exception ex)
             {
                 _setStatus (ex);
-                FileTransferDetails.DeleteFile (newFile);
+                FileTransferHelpers.DeleteFile (newFile);
                 newFile = null;
             }
             finally
@@ -314,7 +314,7 @@ namespace FileListenerPlugin
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
                 outputDirectory += "/";
-            FileTransferDetails.CreateDirectory (outputDirectory);
+            FileTransferHelpers.CreateDirectory (outputDirectory);
 
             // download files
             foreach (var f in GetFileStreams (folder, fileMask, recursive))
@@ -325,11 +325,11 @@ namespace FileListenerPlugin
                 try
                 { 
                     newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
-                    FileTransferDetails.DeleteFile (newFile);
+                    FileTransferHelpers.DeleteFile (newFile);
 
-                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
                     {
-                        f.FileStream.CopyTo (file, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                        f.FileStream.CopyTo (file, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
                     }
 
                     f.FileStream.Close ();
@@ -348,7 +348,7 @@ namespace FileListenerPlugin
                 {
                     _setStatus (ex);
                     Close ();
-                    FileTransferDetails.DeleteFile (newFile);
+                    FileTransferHelpers.DeleteFile (newFile);
                     newFile = null;
                     // delay in case of network error
                     System.Threading.Thread.Sleep (Details.RetryWaitMs);
@@ -449,7 +449,7 @@ namespace FileListenerPlugin
 
         public bool SendFile (string localFilename, string destFilename)
         {
-            using (var file = new FileStream (localFilename, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultReadBufferSize))
+            using (var file = new FileStream (localFilename, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultReadBufferSize))
             {
                 return SendFile (file, destFilename, false);
             }

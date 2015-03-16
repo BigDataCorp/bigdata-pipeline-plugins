@@ -10,7 +10,7 @@ namespace FileListenerPlugin
     public class FileSystemTransfer : IFileTransfer
     {
 
-        public FileTransferDetails Details { get; private set; }
+        public FileTransferConnectionInfo Details { get; private set; }
 
         public FileTranferStatus Status { get; private set; }
 
@@ -35,7 +35,7 @@ namespace FileListenerPlugin
             LastError = message;
         }
 
-        public bool Open (FileTransferDetails details)
+        public bool Open (FileTransferConnectionInfo details)
         {
             Details = details;
             if (Details.RetryCount <= 0)
@@ -47,8 +47,7 @@ namespace FileListenerPlugin
         {
             if (String.IsNullOrEmpty (folder))
                 return;
-            folder = PreparePath (folder.Replace ('\\', '/'));
-            FileTransferDetails.CreateDirectory (folder);
+            FileTransferHelpers.CreateDirectory (folder);
         }
 
         private string PreparePath (string folder)
@@ -102,7 +101,7 @@ namespace FileListenerPlugin
             return new StreamTransfer
             {
                 FileName = file,
-                FileStream = new FileStream (file, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultReadBufferSize)
+                FileStream = new FileStream (file, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultReadBufferSize)
             };
         }
 
@@ -115,7 +114,7 @@ namespace FileListenerPlugin
                 yield return new StreamTransfer
                 {
                     FileName = f.FileName,
-                    FileStream = new FileStream (f.FileName, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultReadBufferSize)
+                    FileStream = new FileStream (f.FileName, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultReadBufferSize)
                 };
             }
         }
@@ -130,25 +129,25 @@ namespace FileListenerPlugin
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
                 outputDirectory += "/";
-            FileTransferDetails.CreateDirectory (outputDirectory);
+            FileTransferHelpers.CreateDirectory (outputDirectory);
 
             // download files
             var f = GetFileStream (file);            
             
             string newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
-            FileTransferDetails.DeleteFile (newFile);
+            FileTransferHelpers.DeleteFile (newFile);
 
             try
             {
-                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
                 {
-                    f.FileStream.CopyTo (output, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                    f.FileStream.CopyTo (output, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
                 }
 
                 // check if we must remove file
                 if (deleteOnSuccess)
                 {
-                    FileTransferDetails.DeleteFile (f.FileName);
+                    FileTransferHelpers.DeleteFile (f.FileName);
                 }
 
                 _setStatus (true);
@@ -156,7 +155,7 @@ namespace FileListenerPlugin
             catch (Exception ex)
             {
                 _setStatus (ex);
-                FileTransferDetails.DeleteFile (newFile);
+                FileTransferHelpers.DeleteFile (newFile);
                 newFile = null;
             }
             finally
@@ -179,25 +178,25 @@ namespace FileListenerPlugin
             outputDirectory = outputDirectory.Replace ('\\', '/');
             if (!outputDirectory.EndsWith ("/"))
                 outputDirectory += "/";
-            FileTransferDetails.CreateDirectory (outputDirectory);
+            FileTransferHelpers.CreateDirectory (outputDirectory);
 
             // download files
             foreach (var f in GetFileStreams (folder, fileMask, recursive))
             {
                 string newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
-                FileTransferDetails.DeleteFile (newFile);
+                FileTransferHelpers.DeleteFile (newFile);
 
                 try
                 {
-                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
                     {
-                        f.FileStream.CopyTo (file, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                        f.FileStream.CopyTo (file, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
                     }
 
                     // check if we must remove file
                     if (deleteOnSuccess)
                     {
-                        FileTransferDetails.DeleteFile (f.FileName);
+                        FileTransferHelpers.DeleteFile (f.FileName);
                     }
 
                     _setStatus (true);
@@ -205,7 +204,7 @@ namespace FileListenerPlugin
                 catch (Exception ex)
                 {
                     _setStatus (ex);
-                    FileTransferDetails.DeleteFile (newFile);
+                    FileTransferHelpers.DeleteFile (newFile);
                     newFile = null;
                 }
                 finally
@@ -231,7 +230,7 @@ namespace FileListenerPlugin
         public bool RemoveFiles (IEnumerable<string> files)
         {
             foreach (var f in files)
-                FileTransferDetails.DeleteFile (f);
+                FileTransferHelpers.DeleteFile (f);
 
             _setStatus (true);
 
@@ -240,7 +239,7 @@ namespace FileListenerPlugin
 
         public bool RemoveFile (string file)
         {
-            FileTransferDetails.DeleteFile (file);
+            FileTransferHelpers.DeleteFile (file);
             _setStatus (true);
             return Status == FileTranferStatus.Success;
         }
@@ -262,11 +261,11 @@ namespace FileListenerPlugin
         {
             try
             {
-                FileTransferDetails.CreateDirectory (System.IO.Path.GetDirectoryName (destFullPath));
+                FileTransferHelpers.CreateDirectory (System.IO.Path.GetDirectoryName (destFullPath));
 
-                using (var file = new FileStream (destFullPath, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferDetails.DefaultWriteBufferSize))
+                using (var file = new FileStream (destFullPath, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
                 {
-                    localFile.CopyTo (file, FileTransferDetails.DefaultWriteBufferSize >> 2);
+                    localFile.CopyTo (file, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
                 }
                 _setStatus (true);
             }

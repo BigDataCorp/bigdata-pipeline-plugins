@@ -12,7 +12,7 @@ namespace FileListenerPlugin
     {        
         string LastError { get; }
 
-        FileTransferDetails Details { get; }
+        FileTransferConnectionInfo Details { get; }
 
         FileTranferStatus Status { get; }
 
@@ -29,11 +29,9 @@ namespace FileListenerPlugin
         /// c:/[path]/[file name or wildcard expression]
         /// 
         /// </summary>
-        bool Open (FileTransferDetails details);
+        bool Open (FileTransferConnectionInfo details);
 
         bool IsOpened ();
-
-        void Dispose ();
 
         IEnumerable<FileTransferInfo> ListFiles ();
 
@@ -63,6 +61,6 @@ namespace FileListenerPlugin
 
         bool SendFile (Stream localFile, string destFullPath, bool closeInputStream);
 
-        // TODO: get and remove | move
+        // TODO: move
     }
 }

@@ -36,7 +36,7 @@
     </Reference>
     <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\BigDataPipeline.Interface.1.7.3\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.7.6\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="NCrontab, Version=2.0.16709.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -64,10 +64,6 @@
   <ItemGroup>
     <Compile Include="AWS\AWSS3Helper.cs" />
     <Compile Include="FileTransfer\S3Transfer.cs" />
-    <Compile Include="FileTransfer\HttpTransfer.cs" />
-    <Compile Include="FileTransfer\FileSystemTransfer.cs" />
-    <Compile Include="FileTransfer\FileTransferDetails.cs" />
-    <Compile Include="FileTransfer\IFileTransfer.cs" />
     <Compile Include="FileTransfer\FTPTransfer.cs" />
     <Compile Include="FileTransfer\SFTPTransfer.cs" />
     <Compile Include="Move.cs" />

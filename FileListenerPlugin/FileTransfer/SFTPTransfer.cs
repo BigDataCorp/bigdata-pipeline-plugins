@@ -3,16 +3,43 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using Renci.SshNet;
+using BigDataPipeline.Interfaces;
 
 namespace FileListenerPlugin
 {
     public class SFTPTransfer : IFileTransfer 
     {
-        SftpClient client;        
+        SftpClient client;
+
+        static string[] serviceSchemes = new[] { "sftp", "ssh" };
+
+        /// <summary>
+        /// Gets the URI scheme names that this intance can handle.
+        /// </summary>
+        public IEnumerable<string> GetSchemeNames ()
+        {
+            return serviceSchemes;
+        }
+
+        public FileTransferConnectionInfo ParseConnectionUri (string connectionUri, IEnumerable<KeyValuePair<string, string>> extraOptions)
+        {
+            var info = new FileTransferConnectionInfo (connectionUri, extraOptions);
+
+            // parse host
+            if (info.Port <= 0)
+            {
+                info.Port = 22;
+            }
+
+            info.FullPath = PreparePath (info.FullPath);
+            info.BasePath = PreparePath (info.BasePath);
+
+            return info;
+        }
 
         public FileTransferConnectionInfo Details { get; private set; }
 
-        public FileTranferStatus Status { get; private set; }
+        public bool Status { get; private set; }
 
         public string LastError { get; private set; }
 
@@ -31,7 +58,7 @@ namespace FileListenerPlugin
 
         private void _setStatus (bool status, string message = null)
         {
-            Status = status ? FileTranferStatus.Success : FileTranferStatus.Error;
+            Status = status;
             LastError = message;
         }
                 
@@ -67,30 +94,21 @@ namespace FileListenerPlugin
                     if (SshKeyFiles == null && Details.Get<string> ("sshKeyFiles", null) != null)
                         SshKeyFiles = Details.Get<string> ("sshKeyFiles", null).Split (new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
 
-                    // create client and tru to connect
+                    // create client and try to connect
                     // if we are retrying, and a keyfile was set, try to use the password instead 
                     if (i % 2 == 1 && !String.IsNullOrEmpty (Details.Password) && SshKeyFiles != null && SshKeyFiles.Length > 0)
-                        client = new SftpClient (Details.Server, Details.Port, Details.Login, Details.Password);
+                        client = new SftpClient (Details.Host, Details.Port, Details.Login, Details.Password);
                     // connect with Private key file
                     else if (SshKeyFiles != null && SshKeyFiles.Length > 0)
-                        client = new SftpClient (Details.Server, Details.Port, Details.Login, SshKeyFiles.Select (k => new PrivateKeyFile (k)).ToArray ());
+                        client = new SftpClient (Details.Host, Details.Port, Details.Login, SshKeyFiles.Select (k => new PrivateKeyFile (k)).ToArray ());
                     // connect with login/password
                     else
-                        client = new SftpClient (Details.Server, Details.Port, Details.Login, Details.Password);
+                        client = new SftpClient (Details.Host, Details.Port, Details.Login, Details.Password);
 
                     client.Connect ();
 
-                    // go to dir
-                    if (!String.IsNullOrEmpty (Details.FilePath))
-                    {
-                        Details.FilePath = PreparePath (Details.FilePath);
-                        CreateDirectory (Details.FilePath);
-                        client.ChangeDirectory (Details.FilePath);
-                    }
-                    else
-                    {
-                        Details.FilePath = PreparePath (Details.FilePath);
-                    }
+                    // go to dir                    
+                    client.ChangeDirectory (Details.BasePath);
 
                     _setStatus (true);
                 }
@@ -186,7 +204,7 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> ListFiles ()
         {
-            return ListFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            return ListFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
@@ -200,18 +218,18 @@ namespace FileListenerPlugin
             return _listFiles (folder, pattern, recursive).Select (i => new FileTransferInfo (i.FullName, i.Length, i.LastWriteTime, i.LastWriteTime));
         }
 
-        public StreamTransfer GetFileStream (string file)
+        public StreamTransferInfo GetFileStream (string file)
         {
             _setStatus (true);
             // download files
-            return new StreamTransfer
+            return new StreamTransferInfo
             {
                 FileName = file,
                 FileStream = client.OpenRead (file)
             };
         }
 
-        public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
+        public IEnumerable<StreamTransferInfo> GetFileStreams (string folder, string fileMask, bool recursive)
         {
             var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferHelpers.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
@@ -247,7 +265,7 @@ namespace FileListenerPlugin
             // download files
             foreach (var f in files)
             {
-                yield return new StreamTransfer
+                yield return new StreamTransferInfo
                 {
                     FileName = f.FullName,
                     FileStream = client.OpenRead (f.FullName)
@@ -255,9 +273,12 @@ namespace FileListenerPlugin
             }
         }
 
-        public IEnumerable<StreamTransfer> GetFileStreams ()
+        public IEnumerable<StreamTransferInfo> GetFileStreams ()
         {
-            return GetFileStreams (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            if (Details.HasWildCardSearch)
+                return GetFileStreams (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            else
+                return new StreamTransferInfo[] { GetFileStream (Details.FullPath) };
         }
 
         public FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess)
@@ -307,6 +328,12 @@ namespace FileListenerPlugin
                     return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
             }
             return null;
+        }
+
+        public string GetFileAsText (string file)
+        {
+            using (var reader = new StreamReader (GetFileStream (file).FileStream, FileTransferHelpers.TryGetEncoding (Details.Get ("encoding", "ISO-8859-1")), true))
+                return reader.ReadToEnd ();
         }
 
         public IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
@@ -373,7 +400,10 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess)
         {
-            return GetFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
+            if (Details.HasWildCardSearch)
+                return GetFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
+            else
+                return new FileTransferInfo[] { GetFile (Details.FullPath, outputDirectory, deleteOnSuccess) };
         }
 
         public bool RemoveFiles (IEnumerable<string> files)
@@ -412,7 +442,7 @@ namespace FileListenerPlugin
                 }
             }
 
-            return Status == FileTranferStatus.Success;
+            return Status;
         }
 
         public bool RemoveFile (string file)
@@ -439,12 +469,12 @@ namespace FileListenerPlugin
                     System.Threading.Thread.Sleep (Details.RetryWaitMs);
                 }
             }
-            return Status == FileTranferStatus.Success;
+            return Status;
         }
 
         public bool SendFile (string localFilename)
         {
-            return SendFile (localFilename, System.IO.Path.Combine (Details.FilePath, System.IO.Path.GetFileName (localFilename)));
+            return SendFile (localFilename, System.IO.Path.Combine (Details.BasePath, System.IO.Path.GetFileName (localFilename)));
         }
 
         public bool SendFile (string localFilename, string destFilename)
@@ -484,6 +514,12 @@ namespace FileListenerPlugin
                 }
             }
             return false;
+        }
+
+        public bool MoveFile (string localFilename, string destFilename)
+        {
+            _setStatus (false, "Operation not supported");
+            return Status;
         }
     }
 }

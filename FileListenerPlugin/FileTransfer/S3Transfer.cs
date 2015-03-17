@@ -3,16 +3,58 @@ using System.Linq;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
+using BigDataPipeline.Interfaces;
 
 namespace FileListenerPlugin
 {
     public class S3Transfer : IFileTransfer 
     {
-        AWSS3Helper client;        
+        AWSS3Helper client;
+
+        static string[] serviceSchemes = new[] { "s3" };
+
+        /// <summary>
+        /// Gets the URI scheme names that this intance can handle.
+        /// </summary>
+        public IEnumerable<string> GetSchemeNames ()
+        {
+            return serviceSchemes;
+        }
+
+        public FileTransferConnectionInfo ParseConnectionUri (string connectionUri, IEnumerable<KeyValuePair<string, string>> extraOptions)
+        {
+            var info = new FileTransferConnectionInfo (connectionUri, extraOptions);
+            
+            // parse host
+            if (String.IsNullOrEmpty (info.Host))
+                info.Host = Amazon.RegionEndpoint.USEast1.SystemName;
+            var i = info.Host.IndexOf (".amazonaws.com", StringComparison.OrdinalIgnoreCase);
+            if (i >= 0)
+            {
+                info.Host = info.Host.Substring (0, i).Replace ("s3.", "").Replace ("s3-", "").Trim ('-').Trim ();
+            }
+
+            // parse bucket name
+            i = info.FullPath.IndexOf ('/');
+            if (i < 0)
+                throw new Exception ("Invalid S3 file search path");
+            info.Set ("bucketName", info.FullPath.Substring (0, i));
+
+            info.FullPath = info.FullPath.Substring (i + 1);
+            info.BasePath = info.BasePath.Substring (i + 1);
+            
+            // adjust search pattern
+            if (info.HasWildCardSearch)
+            {
+                info.SearchPattern = FileTransferHelpers.WildcardToRegex (info.FullPath);
+            }
+
+            return info;
+        }
 
         public FileTransferConnectionInfo Details { get; private set; }
 
-        public FileTranferStatus Status { get; private set; }
+        public bool Status { get; private set; }
 
         public string LastError { get; private set; }
 
@@ -31,7 +73,7 @@ namespace FileListenerPlugin
 
         private void _setStatus (bool status, string message = null)
         {
-            Status = status ? FileTranferStatus.Success : FileTranferStatus.Error;
+            Status = status;
             LastError = message;
         }
                 
@@ -145,7 +187,10 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> ListFiles ()
         {
-            return ListFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            if (Details.HasWildCardSearch)
+                return ListFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            else
+                return ListFiles (Details.FullPath, null, !Details.SearchTopDirectoryOnly);
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
@@ -159,18 +204,18 @@ namespace FileListenerPlugin
             return _listFiles (folder, pattern, recursive);
         }
 
-        public StreamTransfer GetFileStream (string file)
+        public StreamTransferInfo GetFileStream (string file)
         {
             _setStatus (true);
             // download files
-            return new StreamTransfer
+            return new StreamTransferInfo
             {
                 FileName = file,
                 FileStream = client.ReadFile (file, true)
             };
         }
 
-        public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
+        public IEnumerable<StreamTransferInfo> GetFileStreams (string folder, string fileMask, bool recursive)
         {
             var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferHelpers.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
@@ -178,7 +223,7 @@ namespace FileListenerPlugin
             // download files
             foreach (var f in _listFiles (folder, pattern, recursive))
             {
-                yield return new StreamTransfer
+                yield return new StreamTransferInfo
                 {
                     FileName = f.FileName,
                     FileStream = client.ReadFile (f.FileName, false)
@@ -186,9 +231,18 @@ namespace FileListenerPlugin
             }
         }
 
-        public IEnumerable<StreamTransfer> GetFileStreams ()
+        public IEnumerable<StreamTransferInfo> GetFileStreams ()
         {
-            return GetFileStreams (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            _setStatus (true);
+            // download files
+            foreach (var f in ListFiles ())
+            {
+                yield return new StreamTransferInfo
+                {
+                    FileName = f.FileName,
+                    FileStream = client.ReadFile (f.FileName, false)
+                };
+            }
         }
 
         public FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess)
@@ -238,6 +292,12 @@ namespace FileListenerPlugin
                     return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
             }
             return null;
+        }
+
+        public string GetFileAsText (string file)
+        {
+            using (var reader = new StreamReader (GetFileStream (file).FileStream, FileTransferHelpers.TryGetEncoding (Details.Get ("encoding", "ISO-8859-1")), true))
+                return reader.ReadToEnd ();
         }
 
         public IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
@@ -304,7 +364,10 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess)
         {
-            return GetFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
+            if (Details.HasWildCardSearch)
+                return GetFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
+            else
+                return GetFiles (Details.FullPath, null, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
         }
 
         public bool RemoveFiles (IEnumerable<string> files)
@@ -344,7 +407,7 @@ namespace FileListenerPlugin
                 }
             }
 
-            return Status == FileTranferStatus.Success;
+            return Status;
         }
 
         public bool RemoveFile (string file)
@@ -371,12 +434,12 @@ namespace FileListenerPlugin
                     System.Threading.Thread.Sleep (Details.RetryWaitMs);
                 }
             }
-            return Status == FileTranferStatus.Success;
+            return Status;
         }
 
         public bool SendFile (string localFilename)
         {
-            return SendFile (localFilename, System.IO.Path.Combine (Details.FilePath, System.IO.Path.GetFileName (localFilename)));
+            return SendFile (localFilename, System.IO.Path.Combine (Details.BasePath, System.IO.Path.GetFileName (localFilename)));
         }
 
         public bool SendFile (string localFilename, string destFilename)
@@ -421,6 +484,12 @@ namespace FileListenerPlugin
                 }
             }
             return false;
+        }
+
+        public bool MoveFile (string localFilename, string destFilename)
+        {
+            _setStatus (false, "Operation not supported");
+            return Status;
         }
     }
 }

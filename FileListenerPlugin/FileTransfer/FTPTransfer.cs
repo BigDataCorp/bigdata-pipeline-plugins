@@ -5,16 +5,45 @@ using System.Net;
 using System.Net.FtpClient;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
+using BigDataPipeline.Interfaces;
 
 namespace FileListenerPlugin
 {
     public class FTPTransfer : IFileTransfer 
     {
-        FtpClient client;        
+        FtpClient client;
+
+        static string[] serviceSchemes = new[] { "ftp", "ftps", "fptes" };
+
+        /// <summary>
+        /// Gets the URI scheme names that this intance can handle.
+        /// </summary>
+        public IEnumerable<string> GetSchemeNames ()
+        {
+            return serviceSchemes;
+        }
+
+        public FileTransferConnectionInfo ParseConnectionUri (string connectionUri, IEnumerable<KeyValuePair<string, string>> extraOptions)
+        {
+            var info = new FileTransferConnectionInfo (connectionUri, extraOptions);
+
+            // parse host
+            if (info.Port <= 0)
+            {
+                if (info.Location == "ftp")
+                    info.Port = 21;
+                else if (info.Location == "ftps")
+                    info.Port = 990;
+                else if (info.Location == "ftpes")
+                    info.Port = 21;
+            }
+
+            return info;
+        }
 
         public FileTransferConnectionInfo Details { get; private set; }
 
-        public FileTranferStatus Status { get; private set; }
+        public bool Status { get; private set; }
 
         public string LastError { get; private set; }
 
@@ -33,7 +62,7 @@ namespace FileListenerPlugin
 
         private void _setStatus (bool status, string message = null)
         {
-            Status = status ? FileTranferStatus.Success : FileTranferStatus.Error;
+            Status = status;
             LastError = message;
         }
                 
@@ -53,7 +82,7 @@ namespace FileListenerPlugin
             var lastMode = Details.Location;
             // try to apply some fixes
             if (Details.Port <= 0)
-                Details.Port = Details.Location == FileLocation.FTPS ? 990 : 21;
+                Details.Port = Details.Location == "ftps" ? 990 : 21;
 
             // check for empty login/password
             if (String.IsNullOrEmpty (Details.Login) && String.IsNullOrEmpty (Details.Password))
@@ -66,14 +95,14 @@ namespace FileListenerPlugin
             // options are Passive (PASV), ExtenedActive (EPRT) and
             // Active (PORT). EPSV should work for most people against
             // a properly configured server and firewall.
-            var list = new List<Tuple<FileLocation, FtpDataConnectionType>> ()
+            var list = new List<Tuple<string, FtpDataConnectionType>> ()
                 {
-                    new Tuple<FileLocation, FtpDataConnectionType> (FileLocation.FTP, FtpDataConnectionType.AutoPassive),
-                    new Tuple<FileLocation, FtpDataConnectionType> (FileLocation.FTP, FtpDataConnectionType.AutoActive),
-                    new Tuple<FileLocation, FtpDataConnectionType> (FileLocation.FTPS, FtpDataConnectionType.AutoPassive),
-                    new Tuple<FileLocation, FtpDataConnectionType> (FileLocation.FTPS, FtpDataConnectionType.AutoActive),
-                    new Tuple<FileLocation, FtpDataConnectionType> (FileLocation.FTPES, FtpDataConnectionType.AutoPassive),
-                    new Tuple<FileLocation, FtpDataConnectionType> (FileLocation.FTPES, FtpDataConnectionType.AutoActive)
+                    Tuple.Create ("ftp", FtpDataConnectionType.AutoPassive),
+                    Tuple.Create ("ftp", FtpDataConnectionType.AutoActive),
+                    Tuple.Create ("ftps", FtpDataConnectionType.AutoPassive),
+                    Tuple.Create ("ftps", FtpDataConnectionType.AutoActive),
+                    Tuple.Create ("ftp", FtpDataConnectionType.AutoPassive),
+                    Tuple.Create ("ftpes", FtpDataConnectionType.AutoActive)
                 };
             
             list = list.OrderBy (i => i.Item1 == lastMode ? 1 : 2).ToList ();
@@ -88,22 +117,22 @@ namespace FileListenerPlugin
                     
                     client.DataConnectionType = mode.Item2;
 
-                    client.Host = Details.Server;
+                    client.Host = Details.Host;
                     client.Port = Details.Port;
                     client.Credentials = new NetworkCredential (Details.Login, Details.Password);
                     client.ValidateCertificate += new FtpSslValidation (OnValidateCertificate);
                     client.SocketKeepAlive = true;
                     client.ReadTimeout = 30000;
 
-                    client.EncryptionMode = mode.Item1 == FileLocation.FTP ? FtpEncryptionMode.None : mode.Item1 == FileLocation.FTPS ? FtpEncryptionMode.Implicit : FtpEncryptionMode.Explicit;
+                    client.EncryptionMode = mode.Item1 == "ftp" ? FtpEncryptionMode.None : mode.Item1 == "ftps" ? FtpEncryptionMode.Implicit : FtpEncryptionMode.Explicit;
 
                     client.Connect ();
 
                     // go to dir
-                    if (!String.IsNullOrEmpty (Details.FilePath))
+                    if (!String.IsNullOrEmpty (Details.BasePath))
                     {
-                        CreateDirectory (Details.FilePath);
-                        client.SetWorkingDirectory (Details.FilePath);
+                        //CreateDirectory (Details.BasePath);
+                        client.SetWorkingDirectory (Details.BasePath);
                     }
 
                     _setStatus (true);
@@ -211,7 +240,7 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> ListFiles ()
         {
-            return ListFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            return ListFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
@@ -225,18 +254,18 @@ namespace FileListenerPlugin
             return _listFiles (folder, pattern, recursive).Select (i => new FileTransferInfo (i.FullName, i.Size, i.Created, i.Modified));
         }
 
-        public StreamTransfer GetFileStream (string file)
+        public StreamTransferInfo GetFileStream (string file)
         {
             _setStatus (true);
             // download files
-            return new StreamTransfer
+            return new StreamTransferInfo
             {
                 FileName = file,
                 FileStream = client.OpenRead (file)
             };
         }
 
-        public IEnumerable<StreamTransfer> GetFileStreams (string folder, string fileMask, bool recursive)
+        public IEnumerable<StreamTransferInfo> GetFileStreams (string folder, string fileMask, bool recursive)
         {
             var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferHelpers.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
 
@@ -272,7 +301,7 @@ namespace FileListenerPlugin
             // download files
             foreach (var f in files)
             {
-                yield return new StreamTransfer
+                yield return new StreamTransferInfo
                 {
                     FileName = f.FullName,
                     FileStream = client.OpenRead (f.FullName)
@@ -280,9 +309,12 @@ namespace FileListenerPlugin
             }
         }
 
-        public IEnumerable<StreamTransfer> GetFileStreams ()
+        public IEnumerable<StreamTransferInfo> GetFileStreams ()
         {
-            return GetFileStreams (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            if (Details.HasWildCardSearch)
+                return GetFileStreams (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            else
+                return new StreamTransferInfo[] { GetFileStream (Details.FullPath) };
         }
 
         public FileTransferInfo GetFile (string file, string outputDirectory, bool deleteOnSuccess)
@@ -332,6 +364,12 @@ namespace FileListenerPlugin
                     return new FileTransferInfo (newFile, info.Length, info.CreationTime, info.LastWriteTime);
             }
             return null;
+        }
+
+        public string GetFileAsText (string file)
+        {
+            using (var reader = new StreamReader (GetFileStream (file).FileStream, FileTransferHelpers.TryGetEncoding (Details.Get ("encoding", "ISO-8859-1")), true))
+                return reader.ReadToEnd ();
         }
 
         public IEnumerable<FileTransferInfo> GetFiles (string folder, string fileMask, bool recursive, string outputDirectory, bool deleteOnSuccess)
@@ -398,7 +436,10 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> GetFiles (string outputDirectory, bool deleteOnSuccess)
         {
-            return GetFiles (Details.FilePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
+            if (Details.HasWildCardSearch)
+                return GetFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly, outputDirectory, deleteOnSuccess);
+            else
+                return new FileTransferInfo[] { GetFile (Details.FullPath, outputDirectory, deleteOnSuccess) };
         }
 
         public bool RemoveFiles (IEnumerable<string> files)
@@ -437,7 +478,7 @@ namespace FileListenerPlugin
                 }
             }
 
-            return Status == FileTranferStatus.Success;
+            return Status;
         }
 
         public bool RemoveFile (string file)
@@ -464,12 +505,12 @@ namespace FileListenerPlugin
                     System.Threading.Thread.Sleep (Details.RetryWaitMs);
                 }
             }
-            return Status == FileTranferStatus.Success;
+            return Status;
         }
 
         public bool SendFile (string localFilename)
         {
-            return SendFile (localFilename, System.IO.Path.Combine (Details.FilePath, System.IO.Path.GetFileName (localFilename)));
+            return SendFile (localFilename, System.IO.Path.Combine (Details.BasePath, System.IO.Path.GetFileName (localFilename)));
         }
 
         public bool SendFile (string localFilename, string destFilename)
@@ -517,6 +558,12 @@ namespace FileListenerPlugin
                 }
             }
             return false;
+        }
+
+        public bool MoveFile (string localFilename, string destFilename)
+        {
+            _setStatus (false, "Operation not supported");
+            return Status;
         }
     }
 }

@@ -36,7 +36,7 @@
       <HintPath>..\packages\AWSSDK.2.3.23.0\lib\net45\AWSSDK.dll</HintPath>
     </Reference>
     <Reference Include="BigDataPipeline.Interfaces">
-      <HintPath>..\packages\BigDataPipeline.Interface.1.7.3\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.7.6\lib\BigDataPipeline.Interfaces.dll</HintPath>
     </Reference>
     <Reference Include="MongoDB.Bson">
       <HintPath>..\packages\mongocsharpdriver.1.10.0\lib\net35\MongoDB.Bson.dll</HintPath>

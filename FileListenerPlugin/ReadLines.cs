@@ -17,9 +17,8 @@ namespace FileListenerPlugin
 
         public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new ModuleParameterDetails ("searchPath", typeof (string), "search path for files.\nExample: \n* c:/[path]/[file name or wildcard expression] \n* ftp://[login:password@][server][:port]/[path]/[file name or wildcard expression] \n* s3://[login:password@][region endpoint]/[bucketname]/[path]/[file name or wildcard expression]");
+            yield return new ModuleParameterDetails ("inputPath", typeof (string), "search path for files.\nExample: \n* c:/[path]/[file name or wildcard expression] \n* ftp://[login:password@][server][:port]/[path]/[file name or wildcard expression] \n* s3://[login:password@][region endpoint]/[bucketname]/[path]/[file name or wildcard expression]", true);
 
-            yield return new ModuleParameterDetails ("workFolder", typeof (string), "physical path for a temporary work area");
             yield return new ModuleParameterDetails ("backupLocation", typeof(string), "folder location to copy backup files");
             yield return new ModuleParameterDetails ("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
             yield return new ModuleParameterDetails ("errorLocation", typeof(string), "errorLocation");
@@ -47,13 +46,13 @@ namespace FileListenerPlugin
             string lastFile = null;
             int filesCount = 0;
             int maxFilesCount = Int32.MaxValue;            
-            var fileTransferService = context.GetContainer ().GetInstanceOf<IFileTransferService> ();
+            var fileTransferService = context.GetContainer ().GetInstanceOf<IFileService> ();
 
             try
             {
-                var searchPath = _options.Get("searchPath", "");
+                var searchPath = _options.Get ("inputPath", "");
                 if (String.IsNullOrEmpty(searchPath))
-                    throw new ArgumentNullException("searchPath");                
+                    throw new ArgumentNullException ("inputPath");                
 
                 var deleteSourceFile = _options.Get<bool>("deleteSourceFile", false);
                 
@@ -85,11 +84,11 @@ namespace FileListenerPlugin
                         while ((line = reader.ReadLine ()) != null)
                         {
                             context.Emit (layout.Create ()
-                                                .Set ("FileName", f.FileName)
-                                                .Set ("FileCount", filesCount)
-                                                .Set ("FilePath", searchPath)
-                                                .Set ("LineNumber", n++)
-                                                .Set ("Line", line));
+                                                .Set ("fileName", f.FileName)
+                                                .Set ("fileNumber", filesCount)
+                                                .Set ("filePath", searchPath)
+                                                .Set ("lineNumber", n++)
+                                                .Set ("line", line));
                         }
                     }
 

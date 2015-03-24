@@ -21,9 +21,9 @@ namespace FileListenerPlugin
             return serviceSchemes;
         }
 
-        public FileTransferConnectionInfo ParseConnectionUri (string connectionUri, IEnumerable<KeyValuePair<string, string>> extraOptions)
+        public FileServiceConnectionInfo ParseConnectionUri (string connectionUri, IEnumerable<KeyValuePair<string, string>> extraOptions)
         {
-            var info = new FileTransferConnectionInfo (connectionUri, extraOptions);
+            var info = new FileServiceConnectionInfo (connectionUri, extraOptions);
             
             // parse host
             if (String.IsNullOrEmpty (info.Host))
@@ -52,7 +52,7 @@ namespace FileListenerPlugin
             return info;
         }
 
-        public FileTransferConnectionInfo Details { get; private set; }
+        public FileServiceConnectionInfo Details { get; private set; }
 
         public bool Status { get; private set; }
 
@@ -77,7 +77,7 @@ namespace FileListenerPlugin
             LastError = message;
         }
                 
-        public bool Open (FileTransferConnectionInfo details)
+        public bool Open (FileServiceConnectionInfo details)
         { 
             Details = details;
             if (Details.RetryCount <= 0)
@@ -260,9 +260,9 @@ namespace FileListenerPlugin
 
             try
             {
-                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileServiceConnectionInfo.DefaultWriteBufferSize))
                 {
-                    f.FileStream.CopyTo (output, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
+                    f.FileStream.CopyTo (output, FileServiceConnectionInfo.DefaultWriteBufferSize >> 2);
                 }
 
                 // check if we must remove file
@@ -318,9 +318,9 @@ namespace FileListenerPlugin
                     newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
                     FileTransferHelpers.DeleteFile (newFile);
 
-                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultWriteBufferSize))
+                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileServiceConnectionInfo.DefaultWriteBufferSize))
                     {
-                        f.FileStream.CopyTo (file, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
+                        f.FileStream.CopyTo (file, FileServiceConnectionInfo.DefaultWriteBufferSize >> 2);
                     }
 
                     f.FileStream.Close ();
@@ -444,7 +444,7 @@ namespace FileListenerPlugin
 
         public bool SendFile (string localFilename, string destFilename)
         {
-            using (var file = new FileStream (localFilename, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileTransferConnectionInfo.DefaultReadBufferSize))
+            using (var file = new FileStream (localFilename, FileMode.Open, FileAccess.Read, FileShare.Delete | FileShare.Read, FileServiceConnectionInfo.DefaultReadBufferSize))
             {
                 return SendFile (file, destFilename, false);
             }
@@ -465,7 +465,7 @@ namespace FileListenerPlugin
                     {
                         using (var file = localFile)
                         {
-                            file.CopyTo (ostream, FileTransferConnectionInfo.DefaultWriteBufferSize >> 2);
+                            file.CopyTo (ostream, FileServiceConnectionInfo.DefaultWriteBufferSize >> 2);
                         }
                     }                    
                     _setStatus (true);
@@ -490,6 +490,17 @@ namespace FileListenerPlugin
         {
             _setStatus (false, "Operation not supported");
             return Status;
+        }
+
+        public Stream OpenWrite ()
+        {
+            return OpenWrite (Details.FullPath);
+        }
+
+        public Stream OpenWrite (string destFullPath)
+        {            
+            // upload
+            return new S3UploadStream (client, destFullPath, Details.Get ("useReducedRedundancy", false), true, Details.Get ("makePublic", false), Details.Get ("partSize", 20 * 1024 * 1024));
         }
     }
 }

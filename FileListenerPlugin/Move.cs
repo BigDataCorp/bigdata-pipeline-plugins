@@ -17,10 +17,9 @@ namespace FileListenerPlugin
 
         public IEnumerable<ModuleParameterDetails> GetParameterDetails ()
         {
-            yield return new ModuleParameterDetails ("searchPath", typeof (string), "search path for files.\nExample: \n* c:/[path]/[file name or wildcard expression] \n* ftp://[login:password@][server][:port]/[path]/[file name or wildcard expression] \n* s3://[login:password@][region endpoint]/[bucketname]/[path]/[file name or wildcard expression]");
+            yield return new ModuleParameterDetails ("inputPath", typeof (string), "search path for files.\nExample: \n* c:/[path]/[file name or wildcard expression] \n* ftp://[login:password@][server][:port]/[path]/[file name or wildcard expression] \n* s3://[login:password@][region endpoint]/[bucketname]/[path]/[file name or wildcard expression]");
 
-            yield return new ModuleParameterDetails ("destinationPath", typeof (string), "destination path to the downloaded file");
-            yield return new ModuleParameterDetails ("workFolder", typeof (string), "physical path for a temporary work area");
+            yield return new ModuleParameterDetails ("outputPath", typeof (string), "destination path to the downloaded file", true);
             yield return new ModuleParameterDetails ("backupLocation", typeof(string), "folder location to copy backup files");
             yield return new ModuleParameterDetails ("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
             yield return new ModuleParameterDetails ("errorLocation", typeof(string), "errorLocation");
@@ -49,17 +48,17 @@ namespace FileListenerPlugin
             string lastFile = null;
             int filesCount = 0;
             int maxFilesCount = Int32.MaxValue;
-            var fileTransferService = context.GetContainer ().GetInstanceOf<IFileTransferService> ();
+            var fileTransferService = context.GetContainer ().GetInstanceOf<IFileService> ();
 
             try
             {
-                var searchPath = _options.Get("searchPath", "");
+                var searchPath = _options.Get ("inputPath", "");
                 if (String.IsNullOrEmpty(searchPath))
-                    throw new ArgumentNullException("searchPath");
+                    throw new ArgumentNullException ("inputPath");
 
-                var destinationPath = _options.Get ("destinationPath", "");
+                var destinationPath = _options.Get ("outputPath", "");
                 if (String.IsNullOrEmpty(destinationPath))
-                    throw new ArgumentNullException ("destinationPath");
+                    throw new ArgumentNullException ("outputPath");
 
                 var deleteSourceFile = _options.Get<bool>("deleteSourceFile", false);
 
@@ -93,11 +92,11 @@ namespace FileListenerPlugin
                     output.SendFile (f.FileStream, fileName, true);
 
                     context.Emit (layout.Create ()
-                                      .Set ("FileName", fileName)
-                                      .Set ("FileCount", filesCount)
-                                      .Set ("FilePath", destinationPath)
-                                      .Set ("SourcePath", searchPath)
-                                      .Set ("SourceFileName", f.FileName));
+                                      .Set ("fileName", fileName)
+                                      .Set ("fileNumber", filesCount)
+                                      .Set ("filePath", destinationPath)
+                                      .Set ("sourcePath", searchPath)
+                                      .Set ("sourceFileName", f.FileName));
                     
                     // If backup folder exists, move file
                     if (!String.IsNullOrWhiteSpace (_options.Get ("backupLocation", "")))

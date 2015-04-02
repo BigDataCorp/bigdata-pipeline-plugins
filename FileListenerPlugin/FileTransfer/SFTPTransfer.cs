@@ -111,6 +111,10 @@ namespace FileListenerPlugin
                     else
                         client = new SftpClient (Details.Host, Details.Port, Details.Login, Details.Password);
 
+
+                    client.BufferSize = 1024 * 1024;
+                    client.OperationTimeout = TimeSpan.FromHours (1);
+
                     client.Connect ();
 
                     // go to dir                    

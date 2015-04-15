@@ -332,7 +332,7 @@ namespace FileListenerPlugin
 
             try
             {
-                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileServiceConnectionInfo.DefaultWriteBufferSize))
+                using (var output = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete, FileServiceConnectionInfo.DefaultWriteBufferSize))
                 {
                     f.FileStream.CopyTo (output, FileServiceConnectionInfo.DefaultWriteBufferSize >> 2);
                 }
@@ -390,7 +390,7 @@ namespace FileListenerPlugin
                     newFile = System.IO.Path.Combine (outputDirectory, System.IO.Path.GetFileName (f.FileName));
                     FileTransferHelpers.DeleteFile (newFile);
 
-                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete | FileShare.Read, FileServiceConnectionInfo.DefaultWriteBufferSize))
+                    using (var file = new FileStream (newFile, FileMode.Create, FileAccess.Write, FileShare.Delete, FileServiceConnectionInfo.DefaultWriteBufferSize))
                     {
                         f.FileStream.CopyTo (file, FileServiceConnectionInfo.DefaultWriteBufferSize >> 2);
                     }

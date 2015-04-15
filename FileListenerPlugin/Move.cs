@@ -24,7 +24,6 @@ namespace FileListenerPlugin
             yield return new ModuleParameterDetails ("deleteSourceFile", typeof(bool), "true for delete source file, otherwise false");
             yield return new ModuleParameterDetails ("errorLocation", typeof(string), "errorLocation");
 
-            yield return new ModuleParameterDetails ("encoding", typeof (string), "default encoding. Defaults to ISO-8859-1");
             yield return new ModuleParameterDetails ("maxFileCount", typeof (int), "maximum number of files to be processed in this pass");
             
             yield return new ModuleParameterDetails ("sshKeyFiles", typeof (string), "[SFTP] List of ssh key files for sftp");
@@ -65,8 +64,6 @@ namespace FileListenerPlugin
                 maxFilesCount = _options.Get ("maxFileCount", maxFilesCount);
                 if (maxFilesCount <= 0)
                     maxFilesCount = Int32.MaxValue;
-                
-                var defaultEncoding = Encoding.GetEncoding (_options.Get ("encoding", "ISO-8859-1"));
 
                 // prepare paths
                 input = fileTransferService.Open (searchPath, _options);

@@ -11,6 +11,8 @@ namespace FileListenerPlugin
     {
         AWSS3Helper client;
 
+        static Dictionary<string, string> awsEndpointMap = new Dictionary<string, string> (StringComparer.OrdinalIgnoreCase);
+
         static string[] serviceSchemes = new[] { "s3" };
 
         /// <summary>
@@ -25,23 +27,58 @@ namespace FileListenerPlugin
         {
             var info = new FileServiceConnectionInfo (connectionUri, extraOptions);
             
-            // parse host
-            if (String.IsNullOrEmpty (info.Host))
-                info.Host = Amazon.RegionEndpoint.USEast1.SystemName;
-            var i = info.Host.IndexOf (".amazonaws.com", StringComparison.OrdinalIgnoreCase);
-            if (i >= 0)
+            // initialize list of valid endpoints
+            if (awsEndpointMap == null)
             {
-                info.Host = info.Host.Substring (0, i).Replace ("s3.", "").Replace ("s3-", "").Trim ('-').Trim ();
+                var map = new Dictionary<string, string> (StringComparer.OrdinalIgnoreCase);
+                foreach (var endpoint in Amazon.RegionEndpoint.EnumerableAllRegions)
+                {
+                    map[endpoint.SystemName] = endpoint.SystemName;
+                    map[endpoint.SystemName.Replace("-", "")] = endpoint.SystemName;
+                    map[endpoint.GuessEndpointForService ("s3").Hostname] = endpoint.SystemName;
+                    var hostName = endpoint.GetEndpointForService ("s3").Hostname;
+                    map[hostName] = endpoint.SystemName;
+                }
+                awsEndpointMap = map;                
+            }
+            
+            // analise endpoint
+            var missingEndpoint = false;
+            if (String.IsNullOrWhiteSpace (info.Host))
+            {
+                info.Host = Amazon.RegionEndpoint.USEast1.SystemName;
+            }
+            else if (awsEndpointMap.ContainsKey (info.Host))
+            {
+                info.Host = awsEndpointMap[info.Host];
+            }
+            else 
+            {                
+                // in this case the s3 endpoint is missing and we should expect that the BUCKET name was parsed as the HOST
+                // but the uri parse transforms to lowecase the host, so we should parse it again!
+                missingEndpoint = true;
+                // force the default endpoint, if it is missing
+                info.Host = Amazon.RegionEndpoint.USEast1.SystemName;
             }
 
             // parse bucket name
-            i = info.FullPath.IndexOf ('/');
-            if (i < 0)
-                throw new Exception ("Invalid S3 file search path");
-            info.Set ("bucketName", info.FullPath.Substring (0, i));
+            if (!missingEndpoint)
+            {
+                var i = info.FullPath.IndexOf ('/', 1);
+                if (i < 0)
+                    throw new Exception ("Invalid S3 file search path");
+                info.Set ("bucketName", info.FullPath.Substring (0, i).Trim ('/'));
 
-            info.FullPath = info.FullPath.Substring (i + 1);
-            info.BasePath = info.BasePath.Substring (i + 1);
+                info.FullPath = info.FullPath.Substring (i + 1);
+                info.BasePath = info.BasePath.Substring (i + 1);
+            }
+            else
+            {
+                var i = info.FullPath.IndexOf ('/', 5);
+                if (i < 0)
+                    throw new Exception ("Invalid S3 file search path");
+                info.Set ("bucketName", info.ConnectionUri.Substring (5, i - 5).Trim ('/'));
+            }
             
             // adjust search pattern
             if (info.HasWildCardSearch)

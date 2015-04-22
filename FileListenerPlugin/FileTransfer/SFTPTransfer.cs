@@ -139,13 +139,13 @@ namespace FileListenerPlugin
             if (String.IsNullOrEmpty (folder))
                 return;
             folder = PreparePath (folder);
-            if (!client.Exists (folder))
+            if (!client.Exists (folder.TrimEnd ('/') + '/'))
             {
                 var folders = folder.Trim ('/').Split ('/');
                 var current = "/";
                 foreach (var f in folders)
                 {
-                    current += f + "/";
+                    current += f.TrimEnd ('/') + '/';
                     if (!client.Exists (current))
                     {
                         client.CreateDirectory (current);

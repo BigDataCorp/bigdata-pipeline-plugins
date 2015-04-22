@@ -51,7 +51,7 @@ namespace FileListenerPlugin
 
             try
             {
-                var searchPath = _options.Get ("inputPath", "");
+                var searchPath = _options.Get ("inputPath", _options.Get ("searchPath", ""));
                 if (String.IsNullOrEmpty(searchPath))
                     throw new ArgumentNullException ("inputPath");
 
@@ -68,11 +68,10 @@ namespace FileListenerPlugin
                 // prepare paths
                 input = fileTransferService.Open (searchPath, _options);
                 if (!input.IsOpened ())
-                    throw new Exception ("Invalid searchPath: " + searchPath);
+                    throw new Exception (String.Format ("Invalid inputPath, {0}: {1}", input.LastError ?? "", searchPath));
                 output = fileTransferService.Open (destinationPath, _options);
                 if (!output.IsOpened ())
-                    throw new Exception ("Invalid destinationPath: " + destinationPath);
-
+                    throw new Exception (String.Format ("Invalid destinationPath, {0}: {1}", output.LastError ?? "", destinationPath));
 
                 // open connection
                 Layout layout = new Layout ();
@@ -86,7 +85,10 @@ namespace FileListenerPlugin
 
                     // upload file                    
                     var fileName = output.Details.GetDestinationPath (f.FileName);
-                    output.SendFile (f.FileStream, fileName, true);
+                    if (!output.SendFile (f.FileStream, fileName, true))
+                    {
+                        _logger.Error (output.LastError);
+                    }
 
                     context.Emit (layout.Create ()
                                       .Set ("fileName", fileName)

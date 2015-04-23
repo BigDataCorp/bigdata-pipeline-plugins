@@ -37,8 +37,8 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\AWSSDK.2.3.23.0\lib\net45\AWSSDK.dll</HintPath>
     </Reference>
-    <Reference Include="BigDataPipeline.Interfaces">
-      <HintPath>..\packages\BigDataPipeline.Interface.1.8.3\lib\BigDataPipeline.Interfaces.dll</HintPath>
+    <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\BigDataPipeline.Interface.1.8.4\lib\BigDataPipeline.Interfaces.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Dapper, Version=1.39.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -85,7 +85,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Dependencies\Mono.CSharp.dll" />
+    <None Include="Dependencies\Mono.CSharp.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

@@ -212,10 +212,11 @@ namespace FileListenerPlugin
                         yield return f;
         }
 
-        public IEnumerable<FileTransferInfo> ListFiles ()
+        public IEnumerable<FileTransferInfo> ListFiles()
         {
-            return ListFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
-        }
+            var pattern = String.IsNullOrEmpty (Details.SearchPattern) ? null : new System.Text.RegularExpressions.Regex (Details.SearchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            return _listFiles (Details.BasePath, pattern, !Details.SearchTopDirectoryOnly).Select (i => new FileTransferInfo (i.FullName, i.Length, i.LastWriteTime, i.LastWriteTime));
+        }        
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
         {

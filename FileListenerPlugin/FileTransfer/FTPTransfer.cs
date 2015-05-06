@@ -240,7 +240,8 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> ListFiles ()
         {
-            return ListFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            var pattern = String.IsNullOrEmpty(Details.SearchPattern) ? null : new System.Text.RegularExpressions.Regex (Details.SearchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            return _listFiles (Details.BasePath, pattern, !Details.SearchTopDirectoryOnly).Select (i => new FileTransferInfo (i.FullName, i.Size, i.Created, i.Modified));
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)

@@ -74,7 +74,8 @@ namespace FileListenerPlugin
             }
             else
             {
-                var i = info.FullPath.IndexOf ('/', 5);
+                // if endpoint is missing, we can assume that the current host is actually the AWS S3 Bucket
+                var i = info.ConnectionUri.IndexOf('/', 5); // search for "/" skiping "s3://"
                 if (i < 0)
                     throw new Exception ("Invalid S3 file search path");
                 info.Set ("bucketName", info.ConnectionUri.Substring (5, i - 5).Trim ('/'));
@@ -83,7 +84,7 @@ namespace FileListenerPlugin
             // adjust search pattern
             if (info.HasWildCardSearch)
             {
-                info.SearchPattern = FileTransferHelpers.WildcardToRegex (info.FullPath);
+                info.SearchPattern = FileTransferHelpers.WildcardToRegex (info.FullPath.TrimStart('/'));
             }
 
             return info;
@@ -218,16 +219,21 @@ namespace FileListenerPlugin
             folder = PreparePath (folder);
 
             foreach (var f in client.ListFiles (folder, recursive, false, true))
-                if ((pattern == null || pattern.IsMatch (System.IO.Path.GetFileName (f.Key))))
+                if ((pattern == null || pattern.IsMatch (f.Key)))
                     yield return new FileTransferInfo (f.Key, f.Size, f.LastModified, f.LastModified);
         }
 
-        public IEnumerable<FileTransferInfo> ListFiles ()
+        public IEnumerable<FileTransferInfo> ListFiles()
         {
             if (Details.HasWildCardSearch)
-                return ListFiles (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+            {
+                var searchPattern = new System.Text.RegularExpressions.Regex (Details.SearchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+                return _listFiles (Details.BasePath, searchPattern, !Details.SearchTopDirectoryOnly);
+            }
             else
-                return ListFiles (Details.FullPath, null, !Details.SearchTopDirectoryOnly);
+            {
+                return _listFiles (Details.FullPath, null, !Details.SearchTopDirectoryOnly);
+            }
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)

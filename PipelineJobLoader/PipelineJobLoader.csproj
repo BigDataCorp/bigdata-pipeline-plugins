@@ -34,11 +34,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BigDataPipeline.Core.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\BigDataPipeline.Core.Interface.1.2.7\lib\BigDataPipeline.Core.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Core.Interface.1.2.8\lib\BigDataPipeline.Core.Interfaces.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="BigDataPipeline.Interfaces, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\BigDataPipeline.Interface.1.8.4\lib\BigDataPipeline.Interfaces.dll</HintPath>
+      <HintPath>..\packages\BigDataPipeline.Interface.1.8.5\lib\BigDataPipeline.Interfaces.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="NCrontab, Version=2.0.16709.0, Culture=neutral, processorArchitecture=MSIL">

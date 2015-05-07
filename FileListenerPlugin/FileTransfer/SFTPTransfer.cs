@@ -13,6 +13,8 @@ namespace FileListenerPlugin
 
         static string[] serviceSchemes = new[] { "sftp", "ssh" };
 
+        static char[] keyFileDelimiter = new[] { '|' };
+
         /// <summary>
         /// Gets the URI scheme names that this intance can handle.
         /// </summary>
@@ -106,7 +108,7 @@ namespace FileListenerPlugin
                         {
                             foreach (var k in SshKeyFiles)
                             {
-                                var d = k.Split (new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                                var d = k.Split (keyFileDelimiter, StringSplitOptions.RemoveEmptyEntries);
                                 if (d.Length > 1)
                                     authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (d[0].Trim (), d[1].Trim ())));
                                 else
@@ -127,7 +129,7 @@ namespace FileListenerPlugin
                         {
                             foreach (var k in SshKeyFiles)
                             {
-                                var d = k.Split (new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                                var d = k.Split (keyFileDelimiter, StringSplitOptions.RemoveEmptyEntries);
                                 if (d.Length > 1)
                                     authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (d[0].Trim (), d[1].Trim ())));
                                 else if (!String.IsNullOrWhiteSpace (Details.Password))

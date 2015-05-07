@@ -48,6 +48,7 @@ namespace FileListenerPlugin
             int filesCount = 0;
             int maxFilesCount = Int32.MaxValue;
             var fileTransferService = context.GetContainer ().GetInstanceOf<IFileService> ();
+            var deleteSourceFile = _options.Get<bool> ("deleteSourceFile", false);
 
             try
             {
@@ -58,8 +59,6 @@ namespace FileListenerPlugin
                 var destinationPath = _options.Get ("outputPath", "");
                 if (String.IsNullOrEmpty(destinationPath))
                     throw new ArgumentNullException ("outputPath");
-
-                var deleteSourceFile = _options.Get<bool>("deleteSourceFile", false);
 
                 maxFilesCount = _options.Get ("maxFileCount", maxFilesCount);
                 if (maxFilesCount <= 0)
@@ -88,6 +87,23 @@ namespace FileListenerPlugin
                     if (!output.SendFile (f.FileStream, fileName, true))
                     {
                         _logger.Error (output.LastError);
+                        // move to error folder
+                        if (!String.IsNullOrEmpty (_options.Get ("errorLocation", "")))
+                        {
+                            // move files                        
+                            using (var parsedErrorLocation = fileTransferService.Open (_options.Get ("errorLocation", ""), _options))
+                            {
+                                var destName = parsedErrorLocation.Details.GetDestinationPath (lastFile);
+                                if (parsedErrorLocation.SendFile (input.GetFileStream (lastFile).FileStream, destName, true) && deleteSourceFile)
+                                {
+                                    // If DeleSource is set
+                                    input.RemoveFile (lastFile);
+                                    _logger.Info ("File deleted: " + lastFile);
+                                }
+                            }
+                        }
+                        // continue to next file
+                        continue;
                     }
 
                     context.Emit (layout.Create ()
@@ -144,7 +160,12 @@ namespace FileListenerPlugin
                         using (var parsedErrorLocation = fileTransferService.Open (_options.Get ("errorLocation", ""), _options))
                         {
                             var destName = parsedErrorLocation.Details.GetDestinationPath (lastFile);
-                            parsedErrorLocation.SendFile (input.GetFileStream (lastFile).FileStream, destName, true);
+                            if (parsedErrorLocation.SendFile (input.GetFileStream (lastFile).FileStream, destName, true) && deleteSourceFile)
+                            {
+                                // If DeleSource is set
+                                input.RemoveFile (lastFile);
+                                _logger.Info ("File deleted: " + lastFile);
+                            }
                         }
                     }
                 }

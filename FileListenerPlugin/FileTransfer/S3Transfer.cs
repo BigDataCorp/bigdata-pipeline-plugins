@@ -80,12 +80,6 @@ namespace FileListenerPlugin
                     throw new Exception ("Invalid S3 file search path");
                 info.Set ("bucketName", info.ConnectionUri.Substring (5, i - 5).Trim ('/'));
             }
-            
-            // adjust search pattern
-            if (info.HasWildCardSearch)
-            {
-                info.SearchPattern = FileTransferHelpers.WildcardToRegex (info.FullPath.TrimStart('/'));
-            }
 
             return info;
         }
@@ -225,20 +219,12 @@ namespace FileListenerPlugin
 
         public IEnumerable<FileTransferInfo> ListFiles()
         {
-            if (Details.HasWildCardSearch)
-            {
-                var searchPattern = new System.Text.RegularExpressions.Regex (Details.SearchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-                return _listFiles (Details.BasePath, searchPattern, !Details.SearchTopDirectoryOnly);
-            }
-            else
-            {
-                return _listFiles (Details.FullPath, null, !Details.SearchTopDirectoryOnly);
-            }
+            return ListFiles (Details.BasePath, Details.FullPath.TrimStart ('/'), !Details.SearchTopDirectoryOnly);            
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
-        { 
-            return _listFiles (folder, null, recursive);
+        {
+            return ListFiles (folder, null, recursive);
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive)
@@ -260,11 +246,9 @@ namespace FileListenerPlugin
 
         public IEnumerable<StreamTransferInfo> GetFileStreams (string folder, string fileMask, bool recursive)
         {
-            var pattern = String.IsNullOrEmpty (fileMask) ? null : new System.Text.RegularExpressions.Regex (FileTransferHelpers.WildcardToRegex (fileMask), System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-
             _setStatus (true);
             // download files
-            foreach (var f in _listFiles (folder, pattern, recursive))
+            foreach (var f in ListFiles (folder, fileMask, recursive))
             {
                 yield return new StreamTransferInfo
                 {

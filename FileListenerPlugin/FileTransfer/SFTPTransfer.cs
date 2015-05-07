@@ -91,28 +91,64 @@ namespace FileListenerPlugin
 
                     // check for ssh key files
                     string[] SshKeyFiles = Details.Get<string[]>("sshKeyFiles", null);
-                    if (SshKeyFiles == null && Details.Get<string> ("sshKeyFiles", null) != null)
-                        SshKeyFiles = Details.Get<string> ("sshKeyFiles", null).Split (new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (SshKeyFiles == null)
+                        SshKeyFiles = Details.Get<string> ("sshKeyFiles", String.Empty).Split (new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries).Select (s => s.Trim()).ToArray ();
 
                     // create client and try to connect
-                    // if we are retrying, and a keyfile was set, try to use the password instead 
-                    if (i % 2 == 1 && !String.IsNullOrEmpty (Details.Password) && SshKeyFiles != null && SshKeyFiles.Length > 0)
-                        client = new SftpClient (Details.Host, Details.Port, Details.Login, Details.Password);
-                    // connect with Private key file
-                    else if (SshKeyFiles != null && SshKeyFiles.Length > 0)
-                        client = new SftpClient (Details.Host, Details.Port, Details.Login, SshKeyFiles.Select (k =>
+                    var authMethods = new List<AuthenticationMethod> ();
+
+                    // if this is the first attempt, lets try the most comprehensive method
+                    if (i == 0 || i > 3)
+                    {                        
+                        if (!String.IsNullOrWhiteSpace (Details.Password))
+                            authMethods.Add (new PasswordAuthenticationMethod (Details.Login, Details.Password));
+                        if (SshKeyFiles != null && SshKeyFiles.Length > 0)
                         {
-                            var d = k.Split(':');
-                            if (d.Length > 1)
-                                return new PrivateKeyFile (d[0], d[1]);
-                            return new PrivateKeyFile (k);
-                        }).ToArray ());
+                            foreach (var k in SshKeyFiles)
+                            {
+                                var d = k.Split (new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                                if (d.Length > 1)
+                                    authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (d[0].Trim (), d[1].Trim ())));
+                                else
+                                    authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (k.Trim ())));
+                            }
+                        }                        
+                    }
+                    // if we are retrying, and a keyfile was set, only with connect with Private key file
+                    else if (SshKeyFiles != null && SshKeyFiles.Length > 0)
+                    {
+                        // if we are retrying for the third time, use password instead
+                        if (i == 3 && !String.IsNullOrWhiteSpace (Details.Password))
+                        {
+                            authMethods.Add (new PasswordAuthenticationMethod (Details.Login, Details.Password));
+                        }
+                        // if we are retrying, use key files
+                        else
+                        {
+                            foreach (var k in SshKeyFiles)
+                            {
+                                var d = k.Split (new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                                if (d.Length > 1)
+                                    authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (d[0].Trim (), d[1].Trim ())));
+                                else if (!String.IsNullOrWhiteSpace (Details.Password))
+                                    authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (k.Trim (), Details.Password)));
+                                else
+                                    authMethods.Add (new PrivateKeyAuthenticationMethod (Details.Login, new PrivateKeyFile (k.Trim ())));
+                            }
+                        }                        
+                    }
                     // connect with login/password
                     else
-                        client = new SftpClient (Details.Host, Details.Port, Details.Login, Details.Password);
+                    {
+                        authMethods.Add (new PasswordAuthenticationMethod (Details.Login, Details.Password));
+                    }
 
+                    // try to connect
+                    client = new SftpClient (new ConnectionInfo (Details.Host, Details.Port, Details.Login, authMethods.ToArray ()));
 
-                    client.BufferSize = 1024 * 1024;
+                    // set some configurations
+                    if (client.BufferSize < 64 * 1024)
+                        client.BufferSize = 64 * 1024;
                     client.OperationTimeout = TimeSpan.FromHours (1);
 
                     client.Connect ();
@@ -208,19 +244,18 @@ namespace FileListenerPlugin
                     foreach (var n in _listFiles (f.FullName, pattern, recursive))
                         yield return n;
                 else if (f.IsRegularFile)
-                    if (pattern == null || pattern.IsMatch (System.IO.Path.GetFileName (f.FullName)))
+                    if (pattern == null || pattern.IsMatch (f.FullName))
                         yield return f;
         }
 
-        public IEnumerable<FileTransferInfo> ListFiles()
+        public IEnumerable<FileTransferInfo> ListFiles ()
         {
-            var pattern = String.IsNullOrEmpty (Details.SearchPattern) ? null : new System.Text.RegularExpressions.Regex (Details.SearchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            return _listFiles (Details.BasePath, pattern, !Details.SearchTopDirectoryOnly).Select (i => new FileTransferInfo (i.FullName, i.Length, i.LastWriteTime, i.LastWriteTime));
-        }        
+            return ListFiles (Details.BasePath, Details.FullPath.TrimStart ('/'), !Details.SearchTopDirectoryOnly);
+        }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, bool recursive)
         {
-            return _listFiles (folder, null, recursive).Select (i => new FileTransferInfo (i.FullName, i.Length, i.LastWriteTime, i.LastWriteTime));
+            return ListFiles (folder, null, recursive);
         }
 
         public IEnumerable<FileTransferInfo> ListFiles (string folder, string fileMask, bool recursive)
@@ -287,7 +322,7 @@ namespace FileListenerPlugin
         public IEnumerable<StreamTransferInfo> GetFileStreams ()
         {
             if (Details.HasWildCardSearch)
-                return GetFileStreams (Details.BasePath, Details.SearchPattern, !Details.SearchTopDirectoryOnly);
+                return GetFileStreams (Details.BasePath, Details.FullPath.TrimStart ('/'), !Details.SearchTopDirectoryOnly);
             else
                 return new StreamTransferInfo[] { GetFileStream (Details.FullPath) };
         }

@@ -122,10 +122,10 @@ namespace FileListenerPlugin
                     client.Credentials = new NetworkCredential (Details.Login, Details.Password);
                     client.ValidateCertificate += new FtpSslValidation (OnValidateCertificate);
                     client.SocketKeepAlive = true;
-                    client.ReadTimeout = 30000;
+                    client.ReadTimeout = 40000;
 
                     client.EncryptionMode = mode.Item1 == "ftp" ? FtpEncryptionMode.None : mode.Item1 == "ftps" ? FtpEncryptionMode.Implicit : FtpEncryptionMode.Explicit;
-
+                    
                     client.Connect ();
 
                     // go to dir

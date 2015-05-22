@@ -250,11 +250,22 @@ namespace FileListenerPlugin
             // download files
             foreach (var f in ListFiles (folder, fileMask, recursive))
             {
-                yield return new StreamTransferInfo
+                StreamTransferInfo file = null;
+                try
                 {
-                    FileName = f.FileName,
-                    FileStream = client.ReadFile (f.FileName, false)
-                };
+                    file = new StreamTransferInfo
+                    {
+                        FileName = f.FileName,
+                        FileStream = client.ReadFile (f.FileName, false)
+                    };
+                }
+                catch (Exception ex)
+                {
+                    LastError = ex.Message;
+                    // skip file
+                }
+                if (file != null)
+                    yield return file;
             }
         }
 

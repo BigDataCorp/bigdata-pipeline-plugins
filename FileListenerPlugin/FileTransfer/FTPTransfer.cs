@@ -301,11 +301,22 @@ namespace FileListenerPlugin
             // download files
             foreach (var f in files)
             {
-                yield return new StreamTransferInfo
+                StreamTransferInfo file = null;
+                try
                 {
-                    FileName = f.FullName,
-                    FileStream = client.OpenRead (f.FullName)
-                };
+                    file = new StreamTransferInfo
+                    {
+                        FileName = f.FullName,
+                        FileStream = client.OpenRead (f.FullName)
+                    };
+                }
+                catch (Exception ex)
+                {
+                    LastError = ex.Message;
+                    // skip file
+                }
+                if (file != null)
+                    yield return file;
             }
         }
 

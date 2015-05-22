@@ -77,7 +77,10 @@ namespace FileListenerPlugin
                     throw new Exception (String.Format ("Invalid inputPath, {0}: {1}", input.LastError ?? "", searchPath));
 
                 // try move files
-                ParallelTasks<StreamTransferInfo>.Process (input.GetFileStreams ().Take (_maxFilesCount), 1, _options.Get ("maxConcurrency", 2), f => MoveFileInternal (f, searchPath));                
+                ParallelTasks<FileTransferInfo>.Process (input.ListFiles ().Take (_maxFilesCount), 0, _options.Get ("maxConcurrency", 2), f => MoveFileInternal (f, searchPath));                
+
+                if (!String.IsNullOrEmpty (input.LastError))
+                    _logger.Warn (input.LastError);
 
                 if (_filesCount > 0)
                 {
@@ -103,23 +106,33 @@ namespace FileListenerPlugin
             }
         }
  
-        private bool MoveFileInternal (StreamTransferInfo f, string searchPath)
+        private bool MoveFileInternal (FileTransferInfo f, string searchPath)
         {
             _logger.Info ("File found: " + f.FileName);
-            _filesCount++;
-            IFileTransfer output = null;
+            var fileIx = System.Threading.Interlocked.Increment (ref _filesCount);
+            IFileTransfer output = null, input = null;
 
+            // try to execte trasnfer
             try
             {
                 var destinationPath = _options.Get ("outputPath", "");
+                
                 // open destination
-                output = _fileTransferService.Open (destinationPath, _options);
-                if (!output.IsOpened ())
-                    throw new Exception (String.Format ("Invalid destinationPath, {0}: {1}", output.LastError ?? "", destinationPath));
+                // use a lock to avoid hitting the server to open multiple connections at the same time
+                lock (_fileTransferService)
+                {
+                    input = _fileTransferService.Open (searchPath, _options);
+                    output = _fileTransferService.Open (destinationPath, _options);
+                    if (!output.IsOpened ())
+                        throw new Exception (String.Format ("Invalid destinationPath, {0}: {1}", output.LastError ?? "", destinationPath));
+                }   
+             
+                // get input stream
+                var inputStream = input.GetFileStream (f.FileName);
 
                 // upload file                    
                 var fileName = output.Details.GetDestinationPath (f.FileName);
-                if (!output.SendFile (f.FileStream, fileName, true))
+                if (!output.SendFile (inputStream.FileStream, fileName, true))
                 {
                     _logger.Error (output.LastError);
                             
@@ -158,7 +171,9 @@ namespace FileListenerPlugin
             }
             finally
             {
-                if (output != null)
+                if (input != null)
+                    input.Dispose ();
+                if (output != null)                
                     output.Dispose ();
             }
             return true;

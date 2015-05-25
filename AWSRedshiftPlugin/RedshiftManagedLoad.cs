@@ -88,7 +88,12 @@ namespace AWSRedshiftPlugin
                     foreach (var f in files)
                     {
                         var destName = System.IO.Path.Combine (parsedBackupLocation.FilePath, System.IO.Path.GetFileName (f));
-                        s3.MoveFile (f, destName, false);
+                        if (s3.MoveFile (f, destName, false))
+                        {
+                            System.Threading.Thread.Sleep (250);
+                            if (s3.MoveFile (f, destName, false))
+                                logger.Error (String.Format ("Error moving file {0}, {1}" + s3.LastError, f));
+                        }
                     }
                     logger.Success ("Done");
                     return true;
@@ -135,7 +140,9 @@ namespace AWSRedshiftPlugin
 
             logger.Debug ("SQL Script end");
 
-            int num_files = files.Count;
+            // check in current load operations table, which files are being processed
+            // keep doing that, until all files are finished!
+            int num_files;
             do
             {
                 num_files = 0;

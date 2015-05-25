@@ -1233,6 +1233,9 @@ namespace AWSRedshiftPlugin
                 p.BucketName = _bucketName;
                 p.Key = key;
                 var response = DeleteItem (p);
+
+                if (!CheckStatusCode (response.HttpStatusCode))
+                    throw new Exception ("DeleteFile error code " + response.HttpStatusCode.ToString ());
                 
                 return true;
             }
@@ -1416,6 +1419,9 @@ namespace AWSRedshiftPlugin
                     copyRequest.CannedACL = S3CannedACL.PublicRead;
                 
                 CopyObjectResponse copyResponse = CopyItem (copyRequest);
+
+                if (!CheckStatusCode (copyResponse.HttpStatusCode))
+                    throw new Exception ("CopyFile error code " + copyResponse.HttpStatusCode.ToString ());
                 
                 // get the acl of the object
                 if (!makePublic)

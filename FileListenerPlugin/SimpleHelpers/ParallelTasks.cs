@@ -149,7 +149,7 @@ namespace FileListenerPlugin.SimpleHelpers
         {
             // sanity check            
             if (numberOfThreads < 0)
-                throw new ArgumentOutOfRangeException ("Number of threads cannot be less than 0.", "numberOfThreads");
+                throw new ArgumentOutOfRangeException ("Number of threads cannot negative.", "numberOfThreads");
             if (action == null)
                 throw new ArgumentNullException ("action");
 

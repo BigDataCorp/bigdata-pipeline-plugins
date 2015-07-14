@@ -146,6 +146,8 @@ namespace FileListenerPlugin
                     return true;
                 }
 
+                _logger.Debug ("File moved: " + f.FileName);
+
                 // emit file info
                 lock (_context)
                 {

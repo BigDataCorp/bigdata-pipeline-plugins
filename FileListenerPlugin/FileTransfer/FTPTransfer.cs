@@ -57,7 +57,7 @@ namespace FileListenerPlugin
                     msg += "; " + message.InnerException.Message;
             }
             
-            _setStatus (msg != null, msg);
+            _setStatus (false, msg);
         }
 
         private void _setStatus (bool status, string message = null)

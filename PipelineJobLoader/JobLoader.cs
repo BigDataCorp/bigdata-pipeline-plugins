@@ -82,7 +82,7 @@ namespace PipelineJobLoader
                     if (item != null)
                     {
                         item.SetScheduler (item.Scheduler != null ? item.Scheduler.ToArray () : new string[0]);
-                        _storageContext.SavePipelineCollection (item);
+                        _storageContext.SavePipelineJob (item);
                         logger.Info ("Pipeline imported: " + item.Id);
                     }
                     

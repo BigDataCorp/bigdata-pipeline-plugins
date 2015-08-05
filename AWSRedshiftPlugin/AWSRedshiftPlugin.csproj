@@ -46,8 +46,8 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Mono.CSharp, Version=4.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>Dependencies\Mono.CSharp.dll</HintPath>
+      <HintPath>..\packages\SimpleHelpers.ScriptEvaluator.1.1.2\lib\Mono.CSharp.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="NCrontab, Version=2.0.16709.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -80,16 +80,12 @@
     <Compile Include="ScriptEvaluator.cs" />
     <Compile Include="SimpleHelpers\MemoryCache.cs" />
     <Compile Include="SimpleHelpers\NamedLock.cs" />
+    <Compile Include="SimpleHelpers\ScriptEvaluator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config">
       <SubType>Designer</SubType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Dependencies\Mono.CSharp.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

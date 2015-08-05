@@ -72,10 +72,10 @@ namespace AWSRedshiftPlugin
                 {
                     logger.Info ("Files found: " + files.Count);
 
-                    var sqlScript = s3.ReadFileAsText (parsedLoadScript.FilePath, true);
+                    var sqlScript = s3.ReadFileAsText (parsedLoadScript.FilePath, false);                    
 
                     if (String.IsNullOrEmpty (sqlScript))
-                        throw new Exception ("invalid sql script");
+                        throw new Exception ("Invalid sql script: " + parsedLoadScript.FilePath);
                    
                     // Create a PostgeSQL connection string.
                     var connectionString = RedshiftHelper.GetConnectionString (context);
@@ -92,7 +92,7 @@ namespace AWSRedshiftPlugin
                         {
                             System.Threading.Thread.Sleep (250);
                             if (s3.MoveFile (f, destName, false))
-                                logger.Error (String.Format ("Error moving file {0}, {1}" + s3.LastError, f));
+                                logger.Error (String.Format ("Error moving file {0}, {1}", f, s3.LastError));
                         }
                     }
                     logger.Success ("Done");
